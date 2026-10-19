@@ -17,7 +17,7 @@
  * Slow-movers make the formula numerically unstable.
  *
  * This node teaches the boundary problem: classical algorithms give crisp
- * answers exactly when their assumptions hold. Your two TODOs are
+ * answers exactly when their assumptions hold. The two core functions are:
  *   (a) implement the formula
  *   (b) detect when its assumptions don't hold for a given SKU
  *
@@ -28,7 +28,15 @@
 
 // Inputs are merged upstream from two reads — inventory and sales — so this
 // node sees a heterogeneous list. Partition them by which fields are present.
-const all = $input.all().map(i => i.json);
+// NOTE: When routed via Switch in the full workflow, `$input` contains the
+// planner's output item, so we fall back to reading the upstream CSV nodes.
+const rawInput = $input.all().map(i => i.json);
+const all = (rawInput.length > 0 && ("on_hand" in rawInput[0] || "units_sold" in rawInput[0]))
+  ? rawInput
+  : [
+      ...$('Read Inventory JSON').all().map(i => i.json),
+      ...$('Read Sales JSON').all().map(i => i.json),
+    ];
 
 // Default ordering cost (S in the EOQ formula). In production this would
 // vary by supplier and channel; we hard-code a single value so the focus
@@ -49,7 +57,7 @@ function annualDemand(salesForSku) {
   return salesForSku.reduce((acc, r) => acc + Number(r.units_sold), 0);
 }
 
-// ---- TODO #1 — the EOQ formula --------------------------------------------
+// ---- EOQ-1 — the EOQ formula ----------------------------------------------
 
 /**
  * Wilson's Economic Order Quantity:
@@ -66,11 +74,14 @@ function annualDemand(salesForSku) {
  *       and dividing by zero holding cost is meaningless.)
  */
 function eoq(D, S, H) {
-  // TODO [medium] — LO-2: classical optimization
-  throw new Error("TODO [medium]: implement eoq()");
+  // EOQ-1 [medium] — LO-2: classical optimization
+  // Guard against zero or negative demand (D) or holding cost (H).
+  if (!D || D <= 0 || !H || H <= 0) return 0;
+
+  return Math.round(Math.sqrt((2 * D * S) / H));
 }
 
-// ---- TODO #2 — assumption-violation detection -----------------------------
+// ---- EOQ-2 — assumption-violation detection -------------------------------
 
 /**
  * EOQ assumes:
@@ -101,8 +112,42 @@ function eoq(D, S, H) {
  *       trigger multiple flags — that's expected and useful downstream.
  */
 function detectViolations(inv, salesSeries) {
-  // TODO [hard] — LO-4: knowing when classical models fail
-  throw new Error("TODO [hard]: implement detectViolations()");
+  // EOQ-2 [hard] — LO-4: knowing when classical models fail
+  const flags = [];
+  if (!salesSeries || salesSeries.length === 0) return ["low_velocity"];
+
+  const units = salesSeries.map(r => Number(r.units_sold));
+  const mean = arr => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+
+  const last3Mean = mean(units.slice(-3));
+  const prior9Mean = mean(units.slice(0, -3));
+  const first3Mean = mean(units.slice(0, 3));
+  const overallMean = mean(units);
+  const totalAnnual = units.reduce((a, b) => a + b, 0);
+
+  // 1. "viral_spike": recent 3-month average exceeds 2.5x prior 9-month average.
+  if (prior9Mean > 0 && last3Mean > 2.5 * prior9Mean) {
+    flags.push("viral_spike");
+  }
+
+  // 2. "declining": recent 3-month average dropped below 0.5x first 3-month average.
+  if (first3Mean > 0 && last3Mean < 0.5 * first3Mean) {
+    flags.push("declining");
+  }
+
+  // 3. "low_velocity": annual demand below 60 units (< 5 units/month average).
+  if (totalAnnual < 60) {
+    flags.push("low_velocity");
+  }
+
+  // 4. "long_lead_time": lead_time_days > 28 AND volatile demand (CV > 0.5).
+  const variance = units.reduce((acc, u) => acc + Math.pow(u - overallMean, 2), 0) / units.length;
+  const cv = overallMean > 0 ? Math.sqrt(variance) / overallMean : 0;
+  if (Number(inv.lead_time_days) > 28 && cv > 0.5) {
+    flags.push("long_lead_time");
+  }
+
+  return flags;
 }
 
 // ---- Main loop (provided) -------------------------------------------------

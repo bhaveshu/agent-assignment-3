@@ -1,27 +1,18 @@
 {
-  "id": "supply-chain-manager-v1",
   "name": "Supply Chain Manager (Starter)",
   "nodes": [
     {
+      "parameters": {},
       "id": "e7958011-8643-5e6d-83eb-f8725a94331d",
       "name": "Manual Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
         240,
-        380
-      ],
-      "parameters": {}
+        384
+      ]
     },
     {
-      "id": "23dd67ba-9597-5429-8f1f-33c43ee9df61",
-      "name": "Set Goal",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        480,
-        380
-      ],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -34,73 +25,82 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "23dd67ba-9597-5429-8f1f-33c43ee9df61",
+      "name": "Set Goal",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        384
+      ]
     },
     {
+      "parameters": {
+        "fileSelector": "/data/current_inventory.csv",
+        "options": {}
+      },
       "id": "ba465751-aa2a-5ad5-8d86-509879c3285b",
       "name": "Read Inventory File",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
         720,
-        200
+        208
       ],
-      "parameters": {
-        "operation": "read",
-        "fileSelector": "/data/current_inventory.csv",
-        "options": {}
-      }
+      "alwaysOutputData": false
     },
     {
+      "parameters": {
+        "fileFormat": "csv",
+        "options": {
+          "headerRow": true
+        }
+      },
       "id": "ff6d36e5-329c-5618-b171-7f8c07c0609f",
       "name": "Read Inventory JSON",
       "type": "n8n-nodes-base.spreadsheetFile",
       "typeVersion": 2,
       "position": [
         960,
-        200
-      ],
-      "parameters": {
-        "operation": "fromFile",
-        "fileFormat": "csv",
-        "options": {
-          "headerRow": true
-        }
-      }
+        208
+      ]
     },
     {
+      "parameters": {
+        "fileSelector": "/data/sales_history.csv",
+        "options": {}
+      },
       "id": "64b1594e-b8b2-5a1d-a6ca-19452ec29876",
       "name": "Read Sales File",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
         720,
-        380
-      ],
-      "parameters": {
-        "operation": "read",
-        "fileSelector": "/data/sales_history.csv",
-        "options": {}
-      }
+        384
+      ]
     },
     {
+      "parameters": {
+        "fileFormat": "csv",
+        "options": {
+          "headerRow": true
+        }
+      },
       "id": "3c9c7181-257a-50a3-ba30-fd1af3c53f9f",
       "name": "Read Sales JSON",
       "type": "n8n-nodes-base.spreadsheetFile",
       "typeVersion": 2,
       "position": [
         960,
-        380
-      ],
-      "parameters": {
-        "operation": "fromFile",
-        "fileFormat": "csv",
-        "options": {
-          "headerRow": true
-        }
-      }
+        384
+      ]
     },
     {
+      "parameters": {
+        "fileSelector": "/data/suppliers.csv",
+        "options": {}
+      },
       "id": "b412b978-c894-5c7f-b7d0-2f54ff4bb763",
       "name": "Read Suppliers File",
       "type": "n8n-nodes-base.readWriteFile",
@@ -108,14 +108,15 @@
       "position": [
         720,
         560
-      ],
-      "parameters": {
-        "operation": "read",
-        "fileSelector": "/data/suppliers.csv",
-        "options": {}
-      }
+      ]
     },
     {
+      "parameters": {
+        "fileFormat": "csv",
+        "options": {
+          "headerRow": true
+        }
+      },
       "id": "0b521b10-be09-50c8-99d4-46cfc10d569d",
       "name": "Read Suppliers JSON",
       "type": "n8n-nodes-base.spreadsheetFile",
@@ -123,88 +124,60 @@
       "position": [
         960,
         560
-      ],
-      "parameters": {
-        "operation": "fromFile",
-        "fileFormat": "csv",
-        "options": {
-          "headerRow": true
-        }
-      }
+      ]
     },
     {
+      "parameters": {
+        "fileSelector": "/data/shipping_options.csv",
+        "options": {}
+      },
       "id": "12809fa2-b079-549f-ba37-8678434babe1",
       "name": "Read Shipping File",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
         720,
-        740
-      ],
-      "parameters": {
-        "operation": "read",
-        "fileSelector": "/data/shipping_options.csv",
-        "options": {}
-      }
+        752
+      ]
     },
     {
+      "parameters": {
+        "fileFormat": "csv",
+        "options": {
+          "headerRow": true
+        }
+      },
       "id": "49b2c176-edf8-5cee-afab-048628a8eac7",
       "name": "Read Shipping JSON",
       "type": "n8n-nodes-base.spreadsheetFile",
       "typeVersion": 2,
       "position": [
         960,
-        740
-      ],
-      "parameters": {
-        "operation": "fromFile",
-        "fileFormat": "csv",
-        "options": {
-          "headerRow": true
-        }
-      }
+        752
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "/**\n * Build a compact context summary for the Master Planner.\n *\n * The planner does not need the raw 180 sales rows -- that would blow the\n * context budget. We extract the headline numbers and the SKUs already\n * past or near reorder so the planner can pick the right subgoal first.\n *\n * Inputs reach this node via cross-node references to the four CSV-parse\n * nodes upstream. We do NOT mutate them, only summarize.\n */\nconst inventory = $('Read Inventory JSON').all().map(i => i.json);\nconst sales     = $('Read Sales JSON').all().map(i => i.json);\nconst suppliers = $('Read Suppliers JSON').all().map(i => i.json);\nconst goal      = $('Set Goal').first().json.goal;\n\nconst stockout_risk = inventory\n  .filter(r => Number(r.on_hand) <= Number(r.reorder_point))\n  .map(r => ({ sku: r.sku, name: r.name,\n               on_hand: Number(r.on_hand),\n               reorder_point: Number(r.reorder_point) }));\n\nconst overstock_risk = inventory\n  .filter(r => Number(r.on_hand) > Number(r.reorder_point) * 5)\n  .map(r => ({ sku: r.sku, name: r.name,\n               on_hand: Number(r.on_hand),\n               reorder_point: Number(r.reorder_point) }));\n\nconst supplier_summary = suppliers.map(s => ({\n  supplier_id: s.supplier_id,\n  on_time_rate: Number(s.on_time_rate),\n  defect_rate: Number(s.defect_rate),\n}));\n\nreturn [{\n  json: {\n    goal,\n    context_summary: {\n      sku_count: inventory.length,\n      sales_rows: sales.length,\n      stockout_risk,\n      overstock_risk,\n      supplier_summary,\n    },\n  },\n}];\n"
+      },
       "id": "70f5e0e7-f662-56b4-951a-bdca9e778465",
       "name": "Build Context Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         1200,
-        380
-      ],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "/**\n * Build a compact context summary for the Master Planner.\n *\n * The planner does not need the raw 180 sales rows -- that would blow the\n * context budget. We extract the headline numbers and the SKUs already\n * past or near reorder so the planner can pick the right subgoal first.\n *\n * Inputs reach this node via cross-node references to the four CSV-parse\n * nodes upstream. We do NOT mutate them, only summarize.\n */\nconst inventory = $('Read Inventory JSON').all().map(i => i.json);\nconst sales     = $('Read Sales JSON').all().map(i => i.json);\nconst suppliers = $('Read Suppliers JSON').all().map(i => i.json);\nconst goal      = $('Set Goal').first().json.goal;\n\nconst stockout_risk = inventory\n  .filter(r => Number(r.on_hand) <= Number(r.reorder_point))\n  .map(r => ({ sku: r.sku, name: r.name,\n               on_hand: Number(r.on_hand),\n               reorder_point: Number(r.reorder_point) }));\n\nconst overstock_risk = inventory\n  .filter(r => Number(r.on_hand) > Number(r.reorder_point) * 5)\n  .map(r => ({ sku: r.sku, name: r.name,\n               on_hand: Number(r.on_hand),\n               reorder_point: Number(r.reorder_point) }));\n\nconst supplier_summary = suppliers.map(s => ({\n  supplier_id: s.supplier_id,\n  on_time_rate: Number(s.on_time_rate),\n  defect_rate: Number(s.defect_rate),\n}));\n\nreturn [{\n  json: {\n    goal,\n    context_summary: {\n      sku_count: inventory.length,\n      sales_rows: sales.length,\n      stockout_risk,\n      overstock_risk,\n      supplier_summary,\n    },\n  },\n}];\n"
-      }
+        384
+      ]
     },
     {
-      "id": "0b8313e0-3a1e-5e5e-8aeb-eb6ddaebc5d4",
-      "name": "Master Planner Agent",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1440,
-        380
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "anthropic-credential-placeholder",
-          "name": "Anthropic API Key"
-        }
-      },
       "parameters": {
         "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
+        "url": "https://api.openai.com/v1/chat/completions",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
             {
               "name": "content-type",
               "value": "application/json"
@@ -213,33 +186,38 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are the Master Planner Agent for an e-commerce supply-chain operation.\\nYou receive a high-level business goal and a context summary. You decompose\\nthe goal into ordered subgoals and decide which subgoal to dispatch first.\\n\\n# TODO [easy] -- LO-1: hierarchical task decomposition\\n# Define the OUTPUT JSON SCHEMA. The downstream Switch node routes on the\\n# field `next_subgoal`. You must populate it with one of:\\n#   \\\"forecast\\\" | \\\"inventory\\\" | \\\"supplier\\\" | \\\"logistics\\\"\\n#\\n# Required output shape:\\n#   {\\n#     \\\"plan_id\\\": \\\"<short string>\\\",\\n#     \\\"reasoning\\\": \\\"<2-3 sentences explaining the decomposition>\\\",\\n#     \\\"subgoals\\\": [\\n#       { \\\"id\\\": \\\"...\\\", \\\"type\\\": \\\"...\\\", \\\"rationale\\\": \\\"...\\\" },\\n#       ...\\n#     ],\\n#     \\\"next_subgoal\\\": \\\"forecast\\\" | \\\"inventory\\\" | \\\"supplier\\\" | \\\"logistics\\\"\\n#   }\\n#\\n# Add explicit instructions to ALWAYS reply with raw JSON only -- no\\n# markdown fences, no preamble. The Set node downstream parses with JSON.parse.\\n\\n# TODO [medium] -- LO-1: HTN-style decomposition with examples\\n# Provide 1-2 worked examples in the system prompt showing how a goal\\n# decomposes into ordered subgoals. The examples should demonstrate that\\n# subgoal ORDERING matters -- e.g. you can't optimize inventory before\\n# you have a demand forecast. Choose `next_subgoal` to be the first\\n# unblocked subgoal in topological order.\\n\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify('GOAL: ' + $json.goal + '\\n\\nCONTEXT:\\n' + JSON.stringify($json.context_summary, null, 2)) }} }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"gpt-6-luna\",\n  \"reasoning_effort\": \"none\",\n  \"max_completion_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Master Planner Agent for Coastal Goods' supply chain operation. Given a business GOAL and a CONTEXT summary, decompose the goal into ordered subgoals using Hierarchical Task Network (HTN) principles and choose which single subgoal to execute first (`next_subgoal`).\\n\\nAllowed subgoal types (`type` and `next_subgoal`):\\n- \\\"forecast\\\": Predict future SKU demand from historical sales and context.\\n- \\\"inventory\\\": Compute EOQ and handle stockout/overstock exceptions.\\n- \\\"supplier\\\": Score and rank suppliers across cost, lead time, reliability, and quality.\\n- \\\"logistics\\\": Assign shipping carriers under hard and soft constraints.\\n\\nHTN Ordering Rules:\\nSubgoals must respect causal dependencies (topological order). Always set `next_subgoal` to the FIRST unblocked subgoal required by the user's goal:\\n- If the goal involves general Q1 planning, demand forecasting, or full supply-chain optimization where demand trends inform inventory, start with \\\"forecast\\\" -> \\\"inventory\\\" -> \\\"supplier\\\" -> \\\"logistics\\\".\\n- If the goal explicitly focuses on immediate inventory EOQ / stockout / overstock triage assuming current demand, start with \\\"inventory\\\".\\n- If the goal focuses on auditing or ranking vendor performance, start with \\\"supplier\\\".\\n- If the goal focuses on carrier selection or freight routing, start with \\\"logistics\\\".\\n\\nWorked Examples:\\nExample 1:\\nGoal: \\\"Prepare a Q1 demand and replenishment plan for seasonal SKUs.\\\"\\nOutput:\\n{\\\"plan_id\\\":\\\"plan-q1-replenish\\\",\\\"reasoning\\\":\\\"Replenishment quantities depend on projected Q1 demand, so demand forecasting must precede inventory EOQ optimization and supplier selection.\\\",\\\"subgoals\\\":[{\\\"id\\\":\\\"sg-1\\\",\\\"type\\\":\\\"forecast\\\",\\\"rationale\\\":\\\"Estimate Q1 SKU demand and detect viral/seasonal shifts first.\\\"},{\\\"id\\\":\\\"sg-2\\\",\\\"type\\\":\\\"inventory\\\",\\\"rationale\\\":\\\"Compute EOQ and exception actions using updated demand context.\\\"},{\\\"id\\\":\\\"sg-3\\\",\\\"type\\\":\\\"supplier\\\",\\\"rationale\\\":\\\"Select high-reliability suppliers for reorders.\\\"}],\\\"next_subgoal\\\":\\\"forecast\\\"}\\n\\nExample 2:\\nGoal: \\\"Audit current inventory for stockout/overstock anomalies and arrange urgent carrier shipping.\\\"\\nOutput:\\n{\\\"plan_id\\\":\\\"plan-inv-audit\\\",\\\"reasoning\\\":\\\"The goal directly targets current on-hand vs reorder-point violations followed by outbound carrier scheduling, making inventory optimization the first unblocked task.\\\",\\\"subgoals\\\":[{\\\"id\\\":\\\"sg-1\\\",\\\"type\\\":\\\"inventory\\\",\\\"rationale\\\":\\\"Run EOQ and flag viral spike or declining overstock SKUs immediately.\\\"},{\\\"id\\\":\\\"sg-2\\\",\\\"type\\\":\\\"logistics\\\",\\\"rationale\\\":\\\"Book feasible carriers for emergency replenishment shipments.\\\"}],\\\"next_subgoal\\\":\\\"inventory\\\"}\\n\\nRespond with RAW JSON ONLY (no markdown fences, no ```json, no preamble).\\nRequired schema:\\n{\\n  \\\"plan_id\\\": \\\"<short string>\\\",\\n  \\\"reasoning\\\": \\\"<2-3 sentences explaining the HTN decomposition and causal order>\\\",\\n  \\\"subgoals\\\": [\\n    { \\\"id\\\": \\\"sg-1\\\", \\\"type\\\": \\\"forecast|inventory|supplier|logistics\\\", \\\"rationale\\\": \\\"...\\\" }\\n  ],\\n  \\\"next_subgoal\\\": \\\"forecast|inventory|supplier|logistics\\\"\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify('GOAL: ' + $json.goal + '\\n\\nCONTEXT:\\n' + JSON.stringify($json.context_summary, null, 2)) }}\n    }\n  ]\n}",
         "options": {}
+      },
+      "id": "0b8313e0-3a1e-5e5e-8aeb-eb6ddaebc5d4",
+      "name": "Master Planner Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        384
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "6vCH5S9YubOgqHys",
+          "name": "OpenAI Header Auth"
+        }
       }
     },
     {
+      "parameters": {
+        "jsCode": "/**\n * Extract the Master Planner's JSON from the OpenAI response envelope.\n * OPen AI returns { content: [{ type: \"text\", text: \"...\" }], ... }.\n *\n * If your planner replies with markdown fences (```json ...```), the\n * JSON.parse below will fail. Forbid fences in your system prompt\n * (preferred) or strip them here.\n */\nconst raw = ($json.choices?.[0]?.message?.content ?? $json.content?.[0]?.text ?? \"\").trim();\nlet plan;\ntry {\n  plan = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Planner did not return valid JSON. Got:\\n\" + raw.slice(0, 500));\n}\n\n// Pull the goal+context through so downstream branches can reference them.\nconst ctx = $('Build Context Summary').first().json;\n\nreturn [{ json: { ...plan, _goal: ctx.goal, _context: ctx.context_summary } }];\n"
+      },
       "id": "a2c3b3a0-d9dc-5a07-a37b-5e4c5a26a24b",
       "name": "Parse Plan",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         1680,
-        380
-      ],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "/**\n * Extract the Master Planner's JSON from the Anthropic response envelope.\n * Anthropic returns { content: [{ type: \"text\", text: \"...\" }], ... }.\n *\n * If your planner replies with markdown fences (```json ...```), the\n * JSON.parse below will fail. Forbid fences in your system prompt\n * (preferred) or strip them here.\n */\nconst raw = $json.content[0].text.trim();\nlet plan;\ntry {\n  plan = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Planner did not return valid JSON. Got:\\n\" + raw.slice(0, 500));\n}\n\n// Pull the goal+context through so downstream branches can reference them.\nconst ctx = $('Build Context Summary').first().json;\n\nreturn [{ json: { ...plan, _goal: ctx.goal, _context: ctx.context_summary } }];\n"
-      }
+        384
+      ]
     },
     {
-      "id": "dc22767a-90b2-5fd0-8798-5be42df98168",
-      "name": "Route on Subgoal",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
-      "position": [
-        1920,
-        380
-      ],
       "parameters": {
         "rules": {
           "values": [
@@ -247,7 +225,9 @@
               "conditions": {
                 "options": {
                   "caseSensitive": true,
-                  "typeValidation": "strict"
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
                 },
                 "conditions": [
                   {
@@ -256,7 +236,8 @@
                     "operator": {
                       "type": "string",
                       "operation": "equals"
-                    }
+                    },
+                    "id": "7b0f02ab-b7d5-4441-8f36-85b6698c849b"
                   }
                 ],
                 "combinator": "and"
@@ -268,7 +249,9 @@
               "conditions": {
                 "options": {
                   "caseSensitive": true,
-                  "typeValidation": "strict"
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
                 },
                 "conditions": [
                   {
@@ -277,7 +260,8 @@
                     "operator": {
                       "type": "string",
                       "operation": "equals"
-                    }
+                    },
+                    "id": "a19872b9-4b41-4990-ae81-a02ca34d30cf"
                   }
                 ],
                 "combinator": "and"
@@ -289,7 +273,9 @@
               "conditions": {
                 "options": {
                   "caseSensitive": true,
-                  "typeValidation": "strict"
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
                 },
                 "conditions": [
                   {
@@ -298,7 +284,8 @@
                     "operator": {
                       "type": "string",
                       "operation": "equals"
-                    }
+                    },
+                    "id": "db4b3826-1916-465c-8b1b-6cd5dd6ed6b2"
                   }
                 ],
                 "combinator": "and"
@@ -310,7 +297,9 @@
               "conditions": {
                 "options": {
                   "caseSensitive": true,
-                  "typeValidation": "strict"
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
                 },
                 "conditions": [
                   {
@@ -319,7 +308,8 @@
                     "operator": {
                       "type": "string",
                       "operation": "equals"
-                    }
+                    },
+                    "id": "0fc73531-cbd9-46af-8869-6ab8d9a0442a"
                   }
                 ],
                 "combinator": "and"
@@ -332,102 +322,86 @@
         "options": {
           "fallbackOutput": "extra"
         }
-      }
+      },
+      "id": "dc22767a-90b2-5fd0-8798-5be42df98168",
+      "name": "Route on Subgoal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1920,
+        384
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "/**\n * Demand Forecasting Engine — classical statistical forecast.\n *\n * Pedagogical purpose\n * -------------------\n * This Code node implements the *classical* half of a hybrid planning\n * pipeline. It produces a deterministic, reproducible numeric forecast\n * for each SKU using:\n *   1. A 3-month moving average over recent demand\n *   2. A 12-month seasonal index that adjusts for cyclical patterns\n *\n * The downstream LLM node (\"Forecast Context Adjuster\") will take these\n * numbers and revise them using context the math cannot see — promotions,\n * news events, weather, viral product mentions. That handoff is the whole\n * point of the lesson: classical statistics for what is computable,\n * LLM reasoning for what is contextual.\n *\n * If your forecast looks suspicious (e.g. SKU-007 Wool Gloves projects\n * its low summer baseline forward), you have correctly built a *naive*\n * forecaster. The next node is supposed to catch what you missed.\n *\n * Reading: docs/planning-primer.md §\"Classical vs LLM-based planning\"\n */\n\n// ---- Input contract -------------------------------------------------------\n// Upstream node provides items where item.json = {month, sku, name, units_sold}\n// (the parsed sales_history.csv).\n// NOTE: In the full workflow topology, `Route on Subgoal` (Switch) passes the\n// planner's output item rather than raw CSV rows. We fall back to\n// `$('Read Sales JSON').all()` when `$input` does not contain `units_sold`,\n// while preserving `$input.all()` for direct/standalone grader tests.\nconst rawInput = $input.all().map(i => i.json);\nconst sales = (rawInput.length > 0 && \"units_sold\" in rawInput[0])\n  ? rawInput\n  : $('Read Sales JSON').all().map(i => i.json);\n\n// ---- Helpers (provided — do not change) -----------------------------------\n\nfunction groupBySku(rows) {\n  const out = {};\n  for (const r of rows) {\n    (out[r.sku] = out[r.sku] || []).push(r);\n  }\n  // Sort each SKU's series chronologically so \"last 3\" really means \"most recent.\"\n  for (const sku of Object.keys(out)) {\n    out[sku].sort((a, b) => a.month.localeCompare(b.month));\n  }\n  return out;\n}\n\nfunction nextMonth(monthStr) {\n  // \"2025-12\" -> \"2026-01\"\n  const [y, m] = monthStr.split(\"-\").map(Number);\n  const d = new Date(Date.UTC(y, m, 1));\n  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, \"0\")}`;\n}\n\n// ---- The two algorithms YOU implement -------------------------------------\n\n/**\n * Compute a simple 3-month moving average over the most recent units_sold values.\n *\n * @param {Array<{units_sold: number}>} series  Full sorted series for one SKU.\n * @returns {number}  Mean of the last 3 months. If fewer than 3 months of\n *                    data exist, take the mean of what's available.\n *                    Empty series -> 0.\n *\n * Why this matters: the moving average is the simplest possible \"trend\"\n * estimator. It's a STRIPS-style assumption: we assume the recent past\n * predicts the near future. This breaks for viral products and discontinued\n * items — which is exactly why the seasonal index and the LLM step exist.\n */\nfunction movingAverage(series) {\n  // DF-1 [easy] — LO-3: classical baseline forecasting\n  // Guard against empty or missing series.\n  if (!series || series.length === 0) return 0;\n\n  // Slice the last up-to-3 chronological entries and compute their mean.\n  const recent = series.slice(-3);\n  const sum = recent.reduce((acc, r) => acc + Number(r.units_sold), 0);\n  return sum / recent.length;\n}\n\n/**\n * Seasonal index for a target forecast month.\n *\n * Definition for month M:\n *   index(M) = mean(units_sold across rows where month-of-year == M)\n *              / mean(units_sold across the entire series)\n *\n * Interpretation: 1.0 = \"average month\", 1.5 = \"this month historically runs\n * 50% above average\", 0.4 = \"this month historically runs 60% below average.\"\n *\n * With only 12 months of history, the per-month mean degenerates to the\n * single observation we have for that month. That's a known weakness — we\n * accept it for this exercise. Production seasonality models use 2+ years.\n *\n * @param {Array<{month: string, units_sold: number}>} series\n * @param {string} targetMonth  e.g. \"2026-01\" — only the \"01\" portion matters.\n * @returns {number}            Multiplier. Default to 1.0 if you can't compute one.\n */\nfunction seasonalIndex(series, targetMonth) {\n  // DF-2 [medium] — LO-3: time-series decomposition\n  if (!series || series.length === 0 || !targetMonth) return 1.0;\n\n  // 1. Extract the 2-digit month-of-year portion (\"01\"..\"12\").\n  const targetM = String(targetMonth).split(\"-\")[1];\n\n  // 2. Filter rows matching the target month-of-year.\n  const matching = series.filter(r => String(r.month).split(\"-\")[1] === targetM);\n  if (matching.length === 0) return 1.0;\n\n  // 3. Compute mean of matching month rows and overall series mean.\n  const monthMean = matching.reduce((acc, r) => acc + Number(r.units_sold), 0) / matching.length;\n  const overallMean = series.reduce((acc, r) => acc + Number(r.units_sold), 0) / series.length;\n\n  // 4. Guard against division by zero.\n  if (overallMean === 0) return 1.0;\n\n  return monthMean / overallMean;\n}\n\n// ---- Main loop (provided) -------------------------------------------------\n\nconst bySku = groupBySku(sales);\nconst results = [];\n\nfor (const sku of Object.keys(bySku)) {\n  const series = bySku[sku];\n  const last = series[series.length - 1].month;\n  const target = nextMonth(last);\n\n  // Classical forecast = trend (moving average) × seasonality\n  const ma = movingAverage(series);\n  const si = seasonalIndex(series, target);\n  const forecast = ma * si;\n\n  // Crude statistical confidence — coefficient of variation, inverted.\n  // The downstream LLM is supposed to revise this when context demands it.\n  // Watch how often statistical confidence and contextual confidence diverge.\n  const variance = series.length > 1\n    ? series.reduce((acc, r) => acc + Math.pow(r.units_sold - ma, 2), 0) / series.length\n    : 0;\n  const cv = ma > 0 ? Math.sqrt(variance) / ma : 1;\n  const confidence = Math.max(0, Math.min(1, 1 - cv));\n\n  results.push({\n    sku,\n    name: series[0].name,\n    target_month: target,\n    forecast_units: Math.round(forecast),\n    moving_avg: Math.round(ma * 10) / 10,\n    seasonal_index: Math.round(si * 100) / 100,\n    statistical_confidence: Math.round(confidence * 100) / 100,\n    method: \"moving_avg_3 × seasonal_index\",\n    notes: [],\n  });\n}\n\n// n8n Code-node return contract: array of {json: ...}\nreturn results.map(r => ({ json: r }));\n"
+      },
       "id": "8b659ed0-c792-578d-bc52-7a2c7415424e",
       "name": "Demand Forecast Engine",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2160,
-        200
-      ],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "/**\n * Demand Forecasting Engine \u2014 classical statistical forecast.\n *\n * Pedagogical purpose\n * -------------------\n * This Code node implements the *classical* half of a hybrid planning\n * pipeline. It produces a deterministic, reproducible numeric forecast\n * for each SKU using:\n *   1. A 3-month moving average over recent demand\n *   2. A 12-month seasonal index that adjusts for cyclical patterns\n *\n * The downstream LLM node (\"Forecast Context Adjuster\") will take these\n * numbers and revise them using context the math cannot see \u2014 promotions,\n * news events, weather, viral product mentions. That handoff is the whole\n * point of the lesson: classical statistics for what is computable,\n * LLM reasoning for what is contextual.\n *\n * If your forecast looks suspicious (e.g. SKU-007 Wool Gloves projects\n * its low summer baseline forward), you have correctly built a *naive*\n * forecaster. The next node is supposed to catch what you missed.\n *\n * Reading: docs/planning-primer.md \u00a7\"Classical vs LLM-based planning\"\n */\n\n// ---- Input contract -------------------------------------------------------\n// Upstream node provides items where item.json = {month, sku, name, units_sold}\n// (the parsed sales_history.csv).\nconst sales = $input.all().map(i => i.json);\n\n// ---- Helpers (provided \u2014 do not change) -----------------------------------\n\nfunction groupBySku(rows) {\n  const out = {};\n  for (const r of rows) {\n    (out[r.sku] = out[r.sku] || []).push(r);\n  }\n  // Sort each SKU's series chronologically so \"last 3\" really means \"most recent.\"\n  for (const sku of Object.keys(out)) {\n    out[sku].sort((a, b) => a.month.localeCompare(b.month));\n  }\n  return out;\n}\n\nfunction nextMonth(monthStr) {\n  // \"2025-12\" -> \"2026-01\"\n  const [y, m] = monthStr.split(\"-\").map(Number);\n  const d = new Date(Date.UTC(y, m, 1));\n  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, \"0\")}`;\n}\n\n// ---- The two algorithms YOU implement -------------------------------------\n\n/**\n * Compute a simple 3-month moving average over the most recent units_sold values.\n *\n * @param {Array<{units_sold: number}>} series  Full sorted series for one SKU.\n * @returns {number}  Mean of the last 3 months. If fewer than 3 months of\n *                    data exist, take the mean of what's available.\n *                    Empty series -> 0.\n *\n * Why this matters: the moving average is the simplest possible \"trend\"\n * estimator. It's a STRIPS-style assumption: we assume the recent past\n * predicts the near future. This breaks for viral products and discontinued\n * items \u2014 which is exactly why the seasonal index and the LLM step exist.\n */\nfunction movingAverage(series) {\n  // TODO [easy] \u2014 LO-3: classical baseline forecasting\n  //   1. Slice the last up-to-3 entries from `series`.\n  //   2. Sum their `units_sold` and divide by the count.\n  //   3. Return 0 for an empty series.\n  throw new Error(\"TODO [easy]: implement movingAverage()\");\n}\n\n/**\n * Seasonal index for a target forecast month.\n *\n * Definition for month M:\n *   index(M) = mean(units_sold across rows where month-of-year == M)\n *              / mean(units_sold across the entire series)\n *\n * Interpretation: 1.0 = \"average month\", 1.5 = \"this month historically runs\n * 50% above average\", 0.4 = \"this month historically runs 60% below average.\"\n *\n * With only 12 months of history, the per-month mean degenerates to the\n * single observation we have for that month. That's a known weakness \u2014 we\n * accept it for this exercise. Production seasonality models use 2+ years.\n *\n * @param {Array<{month: string, units_sold: number}>} series\n * @param {string} targetMonth  e.g. \"2026-01\" \u2014 only the \"01\" portion matters.\n * @returns {number}            Multiplier. Default to 1.0 if you can't compute one.\n */\nfunction seasonalIndex(series, targetMonth) {\n  // TODO [medium] \u2014 LO-3: time-series decomposition\n  //   1. Extract the month-of-year part: targetMonth.split(\"-\")[1] -> \"01\"..\"12\"\n  //   2. Compute monthMean = mean of units_sold in `series` where the month\n  //      portion of row.month matches.\n  //   3. Compute overallMean = mean of units_sold across the entire series.\n  //   4. Return monthMean / overallMean. Guard against division by zero\n  //      (return 1.0 if overallMean is 0).\n  //   5. If no rows match the target month part, return 1.0.\n  throw new Error(\"TODO [medium]: implement seasonalIndex()\");\n}\n\n// ---- Main loop (provided) -------------------------------------------------\n\nconst bySku = groupBySku(sales);\nconst results = [];\n\nfor (const sku of Object.keys(bySku)) {\n  const series = bySku[sku];\n  const last = series[series.length - 1].month;\n  const target = nextMonth(last);\n\n  // Classical forecast = trend (moving average) \u00d7 seasonality\n  const ma = movingAverage(series);\n  const si = seasonalIndex(series, target);\n  const forecast = ma * si;\n\n  // Crude statistical confidence \u2014 coefficient of variation, inverted.\n  // The downstream LLM is supposed to revise this when context demands it.\n  // Watch how often statistical confidence and contextual confidence diverge.\n  const variance = series.length > 1\n    ? series.reduce((acc, r) => acc + Math.pow(r.units_sold - ma, 2), 0) / series.length\n    : 0;\n  const cv = ma > 0 ? Math.sqrt(variance) / ma : 1;\n  const confidence = Math.max(0, Math.min(1, 1 - cv));\n\n  results.push({\n    sku,\n    name: series[0].name,\n    target_month: target,\n    forecast_units: Math.round(forecast),\n    moving_avg: Math.round(ma * 10) / 10,\n    seasonal_index: Math.round(si * 100) / 100,\n    statistical_confidence: Math.round(confidence * 100) / 100,\n    method: \"moving_avg_3 \u00d7 seasonal_index\",\n    notes: [],\n  });\n}\n\n// n8n Code-node return contract: array of {json: ...}\nreturn results.map(r => ({ json: r }));\n"
-      }
+        208
+      ]
     },
     {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-6-luna\",\n  \"reasoning_effort\": \"none\",\n  \"max_completion_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Forecast Context Adjuster for Coastal Goods. You receive a classical forecast row (`forecast_units = moving_avg * seasonal_index`) for target_month 2026-01 (January, mid-winter) and return raw JSON.\\n\\nAdjustment Rules:\\n1. High statistical_confidence (>= 0.80) OR normal seasonal alignment (summer gear with seasonal_index < 0.40 in Jan; winter gear with seasonal_index > 1.50 in Jan): Accept the classical forecast (`revised_forecast = forecast_units`, `delta_pct = 0`).\\n2. Viral Spike Anomaly (winter/seasonal item with high moving_avg > 300, low statistical_confidence < 0.65, and seasonal_index < 1.0 in January): A Q4 viral surge inflated the annual mean and depressed the naive Jan seasonal_index. Revise `revised_forecast` upward by +35% to +50% above `forecast_units`.\\n3. Secular Decline Anomaly (non-seasonal/legacy electronics like Wired Earbuds with low statistical_confidence < 0.50 and seasonal_index > 1.40 inflating forecast_units above moving_avg): A 12-month linear decline made last January look like a seasonal peak. Override the false seasonal bounce and revise `revised_forecast` downward below `moving_avg` (approx -45% to -55% from `forecast_units`).\\n\\nRespond with RAW JSON ONLY (no markdown fences, no preamble):\\n{\\n  \\\"sku\\\": \\\"<string>\\\",\\n  \\\"revised_forecast\\\": <integer>,\\n  \\\"delta_pct\\\": <number>,\\n  \\\"reasoning\\\": \\\"<1-2 sentences>\\\",\\n  \\\"context_signals_used\\\": [\\\"<signal 1>\\\", \\\"<signal 2>\\\"]\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify('Forecast row:\\n' + JSON.stringify($json, null, 2)) }}\n    }\n  ]\n}",
+        "options": {}
+      },
       "id": "267dbef7-7f2a-5c33-8a36-23c15f3c4928",
       "name": "Forecast Context Adjuster",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         2400,
-        200
+        208
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "anthropic-credential-placeholder",
-          "name": "Anthropic API Key"
+          "id": "6vCH5S9YubOgqHys",
+          "name": "OpenAI Header Auth"
         }
-      },
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
-            {
-              "name": "content-type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are the Forecast Context Adjuster.\\nYou receive a numerical forecast for one SKU (computed by the upstream\\nclassical engine) plus contextual notes. You revise the forecast when\\ncontext demands it and return JSON.\\n\\n# TODO [easy] -- LO-5: hybrid reasoning at the LLM/classical seam\\n# Write the prompt body. Decide:\\n#   1. What contextual signals warrant overriding the classical forecast?\\n#      (Hint: viral mentions, weather anomalies, promotions, supply news.)\\n#   2. By how much should the LLM be allowed to deviate from the math?\\n#      (A 50% revision needs justification a 5% revision does not.)\\n#   3. Required output JSON schema:\\n#        { \\\"sku\\\", \\\"revised_forecast\\\", \\\"delta_pct\\\", \\\"reasoning\\\",\\n#          \\\"context_signals_used\\\" }\\n\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify('Forecast row:\\n' + JSON.stringify($json, null, 2)) }} }\n  ]\n}",
-        "options": {}
       }
     },
     {
+      "parameters": {
+        "jsCode": "/**\n * Inventory Optimization Planner — Economic Order Quantity (EOQ).\n *\n * Pedagogical purpose\n * -------------------\n * EOQ (Wilson, 1934) is the canonical *classical* operations-research model:\n * a closed-form solution under strict assumptions —\n *   - constant demand\n *   - instantaneous replenishment\n *   - no stockouts allowed\n *   - fixed ordering cost, fixed holding cost\n *   - no quantity discounts\n *\n * Real e-commerce violates ALL of these for at least some SKUs. Viral\n * products (looking at you, SKU-007) blow past \"constant demand.\" Discontinued\n * SKUs (SKU-013) make \"no stockouts\" expensive in the wrong direction.\n * Slow-movers make the formula numerically unstable.\n *\n * This node teaches the boundary problem: classical algorithms give crisp\n * answers exactly when their assumptions hold. The two core functions are:\n *   (a) implement the formula\n *   (b) detect when its assumptions don't hold for a given SKU\n *\n * The downstream LLM exception node handles the SKUs you flag.\n *\n * Reading: docs/planning-primer.md §\"STRIPS-style assumptions and where they break\"\n */\n\n// Inputs are merged upstream from two reads — inventory and sales — so this\n// node sees a heterogeneous list. Partition them by which fields are present.\nconst rawInput = $input.all().map(i => i.json);\nconst all = (rawInput.length > 0 && (\"on_hand\" in rawInput[0] || \"units_sold\" in rawInput[0]))\n  ? rawInput\n  : [\n      ...$('Read Inventory JSON').all().map(i => i.json),\n      ...$('Read Sales JSON').all().map(i => i.json),\n    ];\n\n// Default ordering cost (S in the EOQ formula). In production this would\n// vary by supplier and channel; we hard-code a single value so the focus\n// stays on the formula and its assumptions.\nconst ORDERING_COST_USD = 50;\n\n// ---- Helpers (provided) ---------------------------------------------------\n\nfunction partition(rows) {\n  const inventory = rows.filter(r => \"on_hand\" in r);\n  const sales = rows.filter(r => \"units_sold\" in r);\n  return { inventory, sales };\n}\n\nfunction annualDemand(salesForSku) {\n  // Sum units_sold across the rows we have. With 12 months of data this is\n  // the trailing-12-months annual demand.\n  return salesForSku.reduce((acc, r) => acc + Number(r.units_sold), 0);\n}\n\n// ---- EOQ-1 — the EOQ formula ----------------------------------------------\n\n/**\n * Wilson's Economic Order Quantity:\n *\n *   Q* = sqrt( (2 * D * S) / H )\n *\n * @param {number} D  Annual demand        (units per year)\n * @param {number} S  Fixed cost per order (dollars per order)\n * @param {number} H  Holding cost         (dollars per unit per year)\n * @returns {number}  Optimal order quantity, rounded to nearest integer.\n *\n * Hint: Math.sqrt is your friend. Guard against D=0 and H=0 — return 0 in\n *       either case. (You can't optimally order anything for zero demand,\n *       and dividing by zero holding cost is meaningless.)\n */\nfunction eoq(D, S, H) {\n  // EOQ-1 [medium] — LO-2: classical optimization (Wilson's EOQ formula)\n  if (!D || D <= 0 || !H || H <= 0) return 0;\n  return Math.round(Math.sqrt((2 * D * S) / H));\n}\n\n// ---- EOQ-2 — assumption-violation detection -------------------------------\n\n/**\n * EOQ assumes:\n *   (a) demand is roughly constant\n *   (b) lead time is short enough to re-order before stocking out\n *   (c) the SKU isn't perishable (no holding-cost cliff)\n *   (d) demand volume is high enough that an \"optimal batch\" is meaningful\n *\n * Return an array of human-readable flag strings for any assumption that\n * FAILS for this SKU. An empty array means \"EOQ is trustworthy here, ship\n * the formula's recommendation.\"\n *\n * Suggested checks (refine as you wish):\n *   - \"viral_spike\"   : mean(last 3 months) > 2.5 × mean(prior 9 months)\n *   - \"declining\"     : mean(last 3 months) < 0.5 × mean(first 3 months)\n *   - \"low_velocity\"  : annualDemand < 60   (less than ~5/month average)\n *   - \"long_lead_time\": inv.lead_time_days > 28 AND demand is volatile\n *\n * Note on perishability: none of our demo SKUs are perishable, so you do\n * NOT need a perishability check. Document the omission in your analysis\n * write-up — a real implementation would need it.\n *\n * @param {object} inv         Inventory row for the SKU\n * @param {Array}  salesSeries Chronologically sorted sales rows for the SKU\n * @returns {Array<string>}    Flag names, e.g. [\"viral_spike\", \"low_velocity\"]\n *\n * Hint: implement each check as its own small block. A flagged SKU may\n *       trigger multiple flags — that's expected and useful downstream.\n */\nfunction detectViolations(inv, salesSeries) {\n  // EOQ-2 [hard] — LO-4: knowing when classical models fail\n  const flags = [];\n  if (!salesSeries || salesSeries.length === 0) return [\"low_velocity\"];\n  const units = salesSeries.map(r => Number(r.units_sold));\n  const mean = arr => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);\n  const last3Mean = mean(units.slice(-3));\n  const prior9Mean = mean(units.slice(0, -3));\n  const first3Mean = mean(units.slice(0, 3));\n  const overallMean = mean(units);\n  const totalAnnual = units.reduce((a, b) => a + b, 0);\n  // 1. \"viral_spike\": recent 3-month average exceeds 2.5x prior 9-month average.\n  if (prior9Mean > 0 && last3Mean > 2.5 * prior9Mean) {\n    flags.push(\"viral_spike\");\n  }\n  // 2. \"declining\": recent 3-month average dropped below 0.5x first 3-month average.\n  if (first3Mean > 0 && last3Mean < 0.5 * first3Mean) {\n    flags.push(\"declining\");\n  }\n  // 3. \"low_velocity\": annual demand below 60 units (< 5 units/month average).\n  if (totalAnnual < 60) {\n    flags.push(\"low_velocity\");\n  }\n  // 4. \"long_lead_time\": lead_time_days > 28 AND volatile demand (CV > 0.5).\n  const variance = units.reduce((acc, u) => acc + Math.pow(u - overallMean, 2), 0) / units.length;\n  const cv = overallMean > 0 ? Math.sqrt(variance) / overallMean : 0;\n  if (Number(inv.lead_time_days) > 28 && cv > 0.5) {\n    flags.push(\"long_lead_time\");\n  }\n  return flags;\n}\n\n// ---- Main loop (provided) -------------------------------------------------\n\nconst { inventory, sales } = partition(all);\nconst salesBySku = sales.reduce((acc, r) => {\n  (acc[r.sku] = acc[r.sku] || []).push(r);\n  return acc;\n}, {});\nfor (const sku of Object.keys(salesBySku)) {\n  salesBySku[sku].sort((a, b) => a.month.localeCompare(b.month));\n}\n\nconst results = [];\nfor (const inv of inventory) {\n  const series = salesBySku[inv.sku] || [];\n  const D = annualDemand(series);\n  const H = Number(inv.holding_cost_per_unit_year);\n  const Q = eoq(D, ORDERING_COST_USD, H);\n  const flags = detectViolations(inv, series);\n\n  results.push({\n    sku: inv.sku,\n    name: inv.name,\n    on_hand: Number(inv.on_hand),\n    reorder_point: Number(inv.reorder_point),\n    annual_demand: D,\n    eoq_units: Q,\n    holding_cost_per_unit_year: H,\n    ordering_cost_usd: ORDERING_COST_USD,\n    assumption_flags: flags,\n    needs_llm_review: flags.length > 0,\n  });\n}\n\nreturn results.map(r => ({ json: r }));\n"
+      },
       "id": "59684410-12a1-5aa6-9447-6a52df330a95",
       "name": "Inventory EOQ Planner",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2160,
-        380
-      ],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "/**\n * Inventory Optimization Planner \u2014 Economic Order Quantity (EOQ).\n *\n * Pedagogical purpose\n * -------------------\n * EOQ (Wilson, 1934) is the canonical *classical* operations-research model:\n * a closed-form solution under strict assumptions \u2014\n *   - constant demand\n *   - instantaneous replenishment\n *   - no stockouts allowed\n *   - fixed ordering cost, fixed holding cost\n *   - no quantity discounts\n *\n * Real e-commerce violates ALL of these for at least some SKUs. Viral\n * products (looking at you, SKU-007) blow past \"constant demand.\" Discontinued\n * SKUs (SKU-013) make \"no stockouts\" expensive in the wrong direction.\n * Slow-movers make the formula numerically unstable.\n *\n * This node teaches the boundary problem: classical algorithms give crisp\n * answers exactly when their assumptions hold. Your two TODOs are\n *   (a) implement the formula\n *   (b) detect when its assumptions don't hold for a given SKU\n *\n * The downstream LLM exception node handles the SKUs you flag.\n *\n * Reading: docs/planning-primer.md \u00a7\"STRIPS-style assumptions and where they break\"\n */\n\n// Inputs are merged upstream from two reads \u2014 inventory and sales \u2014 so this\n// node sees a heterogeneous list. Partition them by which fields are present.\nconst all = $input.all().map(i => i.json);\n\n// Default ordering cost (S in the EOQ formula). In production this would\n// vary by supplier and channel; we hard-code a single value so the focus\n// stays on the formula and its assumptions.\nconst ORDERING_COST_USD = 50;\n\n// ---- Helpers (provided) ---------------------------------------------------\n\nfunction partition(rows) {\n  const inventory = rows.filter(r => \"on_hand\" in r);\n  const sales = rows.filter(r => \"units_sold\" in r);\n  return { inventory, sales };\n}\n\nfunction annualDemand(salesForSku) {\n  // Sum units_sold across the rows we have. With 12 months of data this is\n  // the trailing-12-months annual demand.\n  return salesForSku.reduce((acc, r) => acc + Number(r.units_sold), 0);\n}\n\n// ---- TODO #1 \u2014 the EOQ formula --------------------------------------------\n\n/**\n * Wilson's Economic Order Quantity:\n *\n *   Q* = sqrt( (2 * D * S) / H )\n *\n * @param {number} D  Annual demand        (units per year)\n * @param {number} S  Fixed cost per order (dollars per order)\n * @param {number} H  Holding cost         (dollars per unit per year)\n * @returns {number}  Optimal order quantity, rounded to nearest integer.\n *\n * Hint: Math.sqrt is your friend. Guard against D=0 and H=0 \u2014 return 0 in\n *       either case. (You can't optimally order anything for zero demand,\n *       and dividing by zero holding cost is meaningless.)\n */\nfunction eoq(D, S, H) {\n  // TODO [medium] \u2014 LO-2: classical optimization\n  throw new Error(\"TODO [medium]: implement eoq()\");\n}\n\n// ---- TODO #2 \u2014 assumption-violation detection -----------------------------\n\n/**\n * EOQ assumes:\n *   (a) demand is roughly constant\n *   (b) lead time is short enough to re-order before stocking out\n *   (c) the SKU isn't perishable (no holding-cost cliff)\n *   (d) demand volume is high enough that an \"optimal batch\" is meaningful\n *\n * Return an array of human-readable flag strings for any assumption that\n * FAILS for this SKU. An empty array means \"EOQ is trustworthy here, ship\n * the formula's recommendation.\"\n *\n * Suggested checks (refine as you wish):\n *   - \"viral_spike\"   : mean(last 3 months) > 2.5 \u00d7 mean(prior 9 months)\n *   - \"declining\"     : mean(last 3 months) < 0.5 \u00d7 mean(first 3 months)\n *   - \"low_velocity\"  : annualDemand < 60   (less than ~5/month average)\n *   - \"long_lead_time\": inv.lead_time_days > 28 AND demand is volatile\n *\n * Note on perishability: none of our demo SKUs are perishable, so you do\n * NOT need a perishability check. Document the omission in your analysis\n * write-up \u2014 a real implementation would need it.\n *\n * @param {object} inv         Inventory row for the SKU\n * @param {Array}  salesSeries Chronologically sorted sales rows for the SKU\n * @returns {Array<string>}    Flag names, e.g. [\"viral_spike\", \"low_velocity\"]\n *\n * Hint: implement each check as its own small block. A flagged SKU may\n *       trigger multiple flags \u2014 that's expected and useful downstream.\n */\nfunction detectViolations(inv, salesSeries) {\n  // TODO [hard] \u2014 LO-4: knowing when classical models fail\n  throw new Error(\"TODO [hard]: implement detectViolations()\");\n}\n\n// ---- Main loop (provided) -------------------------------------------------\n\nconst { inventory, sales } = partition(all);\nconst salesBySku = sales.reduce((acc, r) => {\n  (acc[r.sku] = acc[r.sku] || []).push(r);\n  return acc;\n}, {});\nfor (const sku of Object.keys(salesBySku)) {\n  salesBySku[sku].sort((a, b) => a.month.localeCompare(b.month));\n}\n\nconst results = [];\nfor (const inv of inventory) {\n  const series = salesBySku[inv.sku] || [];\n  const D = annualDemand(series);\n  const H = Number(inv.holding_cost_per_unit_year);\n  const Q = eoq(D, ORDERING_COST_USD, H);\n  const flags = detectViolations(inv, series);\n\n  results.push({\n    sku: inv.sku,\n    name: inv.name,\n    on_hand: Number(inv.on_hand),\n    reorder_point: Number(inv.reorder_point),\n    annual_demand: D,\n    eoq_units: Q,\n    holding_cost_per_unit_year: H,\n    ordering_cost_usd: ORDERING_COST_USD,\n    assumption_flags: flags,\n    needs_llm_review: flags.length > 0,\n  });\n}\n\nreturn results.map(r => ({ json: r }));\n"
-      }
+        384
+      ]
     },
     {
-      "id": "b0d4508a-58d4-55f9-a2be-780eb0469f83",
-      "name": "Inventory Exception Handler",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2400,
-        380
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "anthropic-credential-placeholder",
-          "name": "Anthropic API Key"
-        }
-      },
       "parameters": {
         "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
+        "url": "https://api.openai.com/v1/chat/completions",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
             {
               "name": "content-type",
               "value": "application/json"
@@ -436,11 +410,44 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are the Inventory Exception Handler.\\nYou receive SKUs the EOQ formula flagged as having broken assumptions\\n(viral spike, declining demand, low velocity, etc.). For each, propose\\nan inventory action.\\n\\n# TODO [easy] -- LO-4: planning when the closed-form solution doesn't apply\\n# Write the prompt body. Cover at minimum:\\n#   - \\\"viral_spike\\\": recommend an emergency reorder size larger than EOQ\\n#     suggests, because the formula's \\\"constant demand\\\" assumption is broken.\\n#   - \\\"declining\\\": recommend NOT reordering, possibly a markdown.\\n#   - \\\"low_velocity\\\": EOQ is numerically unstable; recommend a fixed\\n#     small reorder qty (e.g. 30-day demand).\\n# Required output JSON schema:\\n#   { \\\"sku\\\", \\\"recommended_action\\\": \\\"reorder\\\"|\\\"markdown\\\"|\\\"liquidate\\\"|\\\"hold\\\",\\n#     \\\"recommended_qty\\\", \\\"reasoning\\\" }\\n\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify('Flagged SKU:\\n' + JSON.stringify($json, null, 2)) }} }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"gpt-6-luna\",\n  \"reasoning_effort\": \"none\",\n  \"max_completion_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Inventory Exception Handler for Coastal Goods. You receive a SKU row from the EOQ planner with `assumption_flags` and `needs_llm_review`.\\n\\nDecision Rules:\\n1. If `assumption_flags` contains \\\"viral_spike\\\": The constant-demand EOQ assumption is broken and the SKU faces acute stockout risk (`on_hand` < `reorder_point`). Recommend `recommended_action`: \\\"reorder\\\" with an emergency `recommended_qty` significantly larger than `eoq_units` (e.g., 1.5x to 2x `eoq_units`, or ~750-1000 units) to cover accelerating demand and lead time.\\n2. If `assumption_flags` contains \\\"declining\\\": Demand is in secular decline and `on_hand` is heavily overstocked relative to `reorder_point`. Do NOT reorder; recommend `recommended_action`: \\\"markdown\\\" (or \\\"liquidate\\\" if `on_hand` > 6x `reorder_point`) and `recommended_qty`: 0.\\n3. If `assumption_flags` contains \\\"low_velocity\\\": EOQ is numerically unstable at very low volume; recommend \\\"reorder\\\" (if below reorder_point) or \\\"hold\\\" with a small fixed `recommended_qty` equal to ~30-day demand (`Math.round(annual_demand / 12)`).\\n4. If `assumption_flags` contains ONLY \\\"long_lead_time\\\": Recommend \\\"reorder\\\" (if `on_hand` <= 1.5 * `reorder_point`, setting `recommended_qty` = `eoq_units` plus a 20% safety buffer) or \\\"hold\\\" (`recommended_qty`: 0) if `on_hand` is already well above `reorder_point`.\\n5. If `assumption_flags` is empty (`needs_llm_review: false`): Standard EOQ holds. Recommend \\\"reorder\\\" (`recommended_qty`: `eoq_units`) if `on_hand` <= `reorder_point`, otherwise \\\"hold\\\" (`recommended_qty`: 0).\\n\\nRespond with RAW JSON ONLY (no markdown fences, no preamble):\\n{\\n  \\\"sku\\\": \\\"<string>\\\",\\n  \\\"recommended_action\\\": \\\"reorder\\\" | \\\"markdown\\\" | \\\"liquidate\\\" | \\\"hold\\\",\\n  \\\"recommended_qty\\\": <integer>,\\n  \\\"reasoning\\\": \\\"<1-2 sentences explaining the decision and citing the flags/inventory levels>\\\"\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify('Flagged SKU:\\n' + JSON.stringify($json, null, 2)) }}\n    }\n  ]\n}",
         "options": {}
+      },
+      "id": "b0d4508a-58d4-55f9-a2be-780eb0469f83",
+      "name": "Inventory Exception Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        384
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "6vCH5S9YubOgqHys",
+          "name": "OpenAI Header Auth"
+        }
       }
     },
     {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-6-luna\",\n  \"reasoning_effort\": \"none\",\n  \"max_completion_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Supplier Performance Monitor for Coastal Goods, a DTC seasonal e-commerce brand. Score and rank every supplier in the roster on a 0-100 scale across four weighted dimensions (total weight = 100):\\n\\n1. reliability (max 35 pts): Based on `on_time_rate` (higher is better; e.g., >=0.97 gets 33-35, 0.91-0.95 gets 28-32, 0.84-0.88 gets 20-25).\\n2. quality (max 25 pts): Based on `1 - defect_rate` (lower defect_rate is better; e.g., <=0.008 gets 23-25, 0.010-0.015 gets 19-22, >=0.018 gets 14-17).\\n3. lead_time (max 25 pts): Based on `avg_lead_time_days` (shorter is better; e.g., <=7d gets 25, 14-18d gets 20-22, 24-28d gets 13-16, >=35d gets 10).\\n4. cost (max 15 pts): Proxy is `payment_terms_days` (longer net terms improve cash flow; 60d = 15, 45d = 11, 30d = 8).\\n\\nSum the four integers to get `score_total` (0-100). Assign `tier`:\\n- \\\"preferred\\\": score_total >= 85\\n- \\\"approved\\\": 75 <= score_total < 85\\n- \\\"watch\\\": 65 <= score_total < 75\\n- \\\"deprioritize\\\": score_total < 65\\n\\nRespond with a RAW JSON ARRAY of objects (one object per supplier, no markdown fences, no preamble):\\n[\\n  {\\n    \\\"supplier_id\\\": \\\"<string>\\\",\\n    \\\"score_total\\\": <integer>,\\n    \\\"score_breakdown\\\": { \\\"cost\\\": <int>, \\\"lead_time\\\": <int>, \\\"reliability\\\": <int>, \\\"quality\\\": <int> },\\n    \\\"tier\\\": \\\"preferred\\\" | \\\"approved\\\" | \\\"watch\\\" | \\\"deprioritize\\\",\\n    \\\"recommendation\\\": \\\"<1 sentence actionable recommendation>\\\"\\n  }\\n]\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify('Supplier roster:\\n' + JSON.stringify(($input.all()[0]?.json?.supplier_id ? $input.all() : $('Read Suppliers JSON').all()).map(i => i.json), null, 2)) }}\n    }\n  ]\n}",
+        "options": {}
+      },
       "id": "1051c1f6-5908-509e-bb6c-8788a4b24de0",
       "name": "Supplier Performance Monitor",
       "type": "n8n-nodes-base.httpRequest",
@@ -451,75 +458,33 @@
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "anthropic-credential-placeholder",
-          "name": "Anthropic API Key"
+          "id": "6vCH5S9YubOgqHys",
+          "name": "OpenAI Header Auth"
         }
-      },
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
-            {
-              "name": "content-type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are the Supplier Performance Monitor.\\nYou receive the supplier roster with KPIs and produce scored rankings.\\n\\n# TODO [medium] -- LO-5: LLM-based multi-criteria reasoning\\n# Design a 0-100 scoring rubric across these four dimensions and explain\\n# the weights you choose:\\n#   - cost         (proxy: payment_terms_days; longer = better cash position)\\n#   - lead time    (avg_lead_time_days; shorter = better)\\n#   - reliability  (on_time_rate; higher = better)\\n#   - quality      (1 - defect_rate; higher = better)\\n# Required output JSON schema (one object per supplier):\\n#   { \\\"supplier_id\\\", \\\"score_total\\\",\\n#     \\\"score_breakdown\\\": { \\\"cost\\\", \\\"lead_time\\\", \\\"reliability\\\", \\\"quality\\\" },\\n#     \\\"tier\\\": \\\"preferred\\\"|\\\"approved\\\"|\\\"watch\\\"|\\\"deprioritize\\\",\\n#     \\\"recommendation\\\": \\\"...\\\" }\\n\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify('Supplier roster:\\n' + JSON.stringify($input.all().map(i => i.json), null, 2)) }} }\n  ]\n}",
-        "options": {}
       }
     },
     {
+      "parameters": {
+        "jsCode": "/**\n * Manufacture three illustrative shipping requests so the logistics branch\n * has work to do. In a real system these would come from order management;\n * we synthesize them here so the assignment is self-contained.\n */\nconst requests = [\n  { type: \"request\", request_id: \"REQ-001\", weight_kg:  850, origin_region: \"Asia\",          dest_region: \"North America\", deadline_days: 14, perishable: false },\n  { type: \"request\", request_id: \"REQ-002\", weight_kg:   60, origin_region: \"North America\", dest_region: \"North America\", deadline_days:  3, perishable: true  },\n  { type: \"request\", request_id: \"REQ-003\", weight_kg: 1200, origin_region: \"Europe\",        dest_region: \"North America\", deadline_days: 21, perishable: false },\n];\nconst options = $('Read Shipping JSON').all().map(i => ({ type: \"option\", ...i.json }));\nreturn [...requests, ...options].map(x => ({ json: x }));\n"
+      },
       "id": "7dbbcf62-2aa2-58b7-9a7d-4dd7f48f8277",
       "name": "Build Shipping Requests",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2160,
-        740
-      ],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "/**\n * Manufacture three illustrative shipping requests so the logistics branch\n * has work to do. In a real system these would come from order management;\n * we synthesize them here so the assignment is self-contained.\n */\nconst requests = [\n  { type: \"request\", request_id: \"REQ-001\", weight_kg:  850, origin_region: \"Asia\",          dest_region: \"North America\", deadline_days: 14, perishable: false },\n  { type: \"request\", request_id: \"REQ-002\", weight_kg:   60, origin_region: \"North America\", dest_region: \"North America\", deadline_days:  3, perishable: true  },\n  { type: \"request\", request_id: \"REQ-003\", weight_kg: 1200, origin_region: \"Europe\",        dest_region: \"North America\", deadline_days: 21, perishable: false },\n];\nconst options = $('Read Shipping JSON').all().map(i => ({ type: \"option\", ...i.json }));\nreturn [...requests, ...options].map(x => ({ json: x }));\n"
-      }
+        752
+      ]
     },
     {
-      "id": "e3170f22-7651-5e3d-bf3f-870ba86f8edf",
-      "name": "Logistics Coordinator (LLM)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2400,
-        740
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "anthropic-credential-placeholder",
-          "name": "Anthropic API Key"
-        }
-      },
       "parameters": {
         "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
+        "url": "https://api.openai.com/v1/chat/completions",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
             {
               "name": "content-type",
               "value": "application/json"
@@ -528,82 +493,96 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are the Logistics Coordinator.\\nYou receive shipping requests and the carrier catalogue. For each request\\nyou select a carrier and explain the trade-offs.\\n\\n# TODO [easy] -- LO-5: LLM-based planning with soft constraints\\n# Write the prompt body. Address:\\n#   1. Hard constraints: deadline, weight, perishability, region match.\\n#   2. Soft preferences: cost, transit-time risk, supplier relationships.\\n#   3. When two options are close on cost, prefer the one with more\\n#      time slack (transit_days well under deadline).\\n# Required output JSON schema (one per request):\\n#   { \\\"request_id\\\", \\\"chosen_option_id\\\", \\\"alternatives_considered\\\": [...],\\n#     \\\"trade_off_summary\\\": \\\"...\\\", \\\"use_classical_fallback\\\": false }\\n#\\n# Set `use_classical_fallback: true` ONLY when the request is purely numeric\\n# (no soft constraints) -- the IF node downstream will route those to the\\n# deterministic greedy planner instead.\\n\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify('Request:\\n' + JSON.stringify($json, null, 2) + '\\n\\nOptions:\\n' + JSON.stringify($('Read Shipping JSON').all().map(i => i.json), null, 2)) }} }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"gpt-6-luna\",\n  \"reasoning_effort\": \"none\",\n  \"max_completion_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Logistics Coordinator for Coastal Goods. You receive a shipping input and the carrier catalogue (`Options`).\\n\\nRules:\\n1. If the input `Request` has `type: \\\"option\\\"` (not a shipping request), return `{\\\"request_id\\\": $json.option_id, \\\"chosen_option_id\\\": null, \\\"alternatives_considered\\\": [], \\\"trade_off_summary\\\": \\\"Catalogue option row skipped.\\\", \\\"use_classical_fallback\\\": false}`.\\n2. Hard constraints (MUST satisfy all): `origin_region` == request `origin_region`, `destination_region` == request `dest_region`, `transit_days` <= `deadline_days`, `max_weight_kg` >= `weight_kg`, and if `perishable == true` then `supports_perishable == true`.\\n3. Soft preferences: Balance total cost (`weight_kg * cost_per_kg`) against transit-time slack (`deadline_days - transit_days`). When two feasible options are within ~10% on cost, prefer the carrier with greater time slack. If NO carrier meets hard constraints (e.g. REQ-002 needing <=3d in North America when fastest ground is 5d), set `chosen_option_id: null` and explain the closest alternative (`SHP-005` UPS Ground at 5d) in `trade_off_summary`.\\n4. Classical Fallback (`use_classical_fallback`): Set `use_classical_fallback: true` ONLY when the request is purely numerical with no soft-constraint ambiguity or infeasibility (e.g., standard non-perishable freight like REQ-001 or REQ-003 where deterministic greedy min-cost search applies). Set `use_classical_fallback: false` when soft-constraint reasoning or infeasible-deadline escalation is needed (like REQ-002).\\n\\nRespond with RAW JSON ONLY (no markdown fences, no preamble):\\n{\\n  \\\"request_id\\\": \\\"<string>\\\",\\n  \\\"chosen_option_id\\\": \\\"<string or null>\\\",\\n  \\\"alternatives_considered\\\": [\\\"<option_id>\\\", ...],\\n  \\\"trade_off_summary\\\": \\\"<1-2 sentences>\\\",\\n  \\\"use_classical_fallback\\\": true | false\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify('Request:\\n' + JSON.stringify($json, null, 2) + '\\n\\nOptions:\\n' + JSON.stringify($('Read Shipping JSON').all().map(i => i.json), null, 2)) }}\n    }\n  ]\n}",
         "options": {}
+      },
+      "id": "e3170f22-7651-5e3d-bf3f-870ba86f8edf",
+      "name": "Logistics Coordinator (LLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        752
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "6vCH5S9YubOgqHys",
+          "name": "OpenAI Header Auth"
+        }
       }
     },
     {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ JSON.parse($json.choices?.[0]?.message?.content ?? $json.content?.[0]?.text ?? \"{}\").use_classical_fallback }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "id": "101ac32e-6330-470e-a8c9-f092b57bea53"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
       "id": "7ea7b7a4-878a-5bf2-ab4e-ac35a1461de3",
       "name": "Use Classical Fallback?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
         2640,
-        740
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.use_classical_fallback }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
+        752
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "/**\n * Classical Logistics Planner — greedy fallback.\n *\n * Pedagogical purpose\n * -------------------\n * This is the \"planning without an LLM\" branch of the Logistics Coordinator.\n * The LLM logistics node handles soft-constraint cases (special instructions,\n * supplier relationships, urgency framing, multi-leg trade-offs). When the\n * upstream IF node decides a situation is purely numerical — fixed weight,\n * fixed deadline, available carriers — it routes here for a deterministic,\n * auditable choice.\n *\n * Greedy is the simplest classical search: at each decision point, take the\n * locally best option. It's not always globally optimal, but it's fast,\n * explainable, and a perfect baseline to compare LLM plans against.\n *\n * Reading: docs/planning-primer.md §\"Classical search and the cost of optimality\"\n */\n\n// Inputs are merged upstream — shipping requests AND the catalogue of options.\n//\n// A request: { type: \"request\", request_id, weight_kg, origin_region,\n//              dest_region, deadline_days, perishable }\n// An option: { type: \"option\",  option_id, carrier, mode, origin_region,\n//              destination_region, transit_days, cost_per_kg,\n//              max_weight_kg, supports_perishable }\n\nconst rawInput = $input.all().map(i => i.json);\nconst all = (rawInput.length > 0 && (\"type\" in rawInput[0]))\n  ? rawInput\n  : $('Build Shipping Requests').all().map(i => i.json);\nconst requests = all.filter(x => x.type === \"request\");\nconst options  = all.filter(x => x.type === \"option\");\n\n// ---- LG-2 — greedy carrier assignment -------------------------------------\n\n/**\n * Pick the cheapest shipping option satisfying ALL hard constraints\n * for one request:\n *   - origin_region matches request.origin_region\n *   - destination_region matches request.dest_region\n *   - transit_days <= request.deadline_days\n *   - max_weight_kg >= request.weight_kg\n *   - if request.perishable === true, supports_perishable must also be true\n *\n * Total cost = request.weight_kg × option.cost_per_kg  (we ignore time cost)\n *\n * @param {object} req\n * @param {Array}  options\n * @returns {object|null}  Chosen option augmented with `total_cost_usd`,\n *                         or null if nothing satisfies the constraints.\n *\n * Hint: this is two steps — filter, then min-by-cost.\n *   1. Array.prototype.filter against the 5 hard constraints.\n *   2. If the filtered list is empty, return null (infeasible).\n *   3. Map each survivor to {...option, total_cost_usd: req.weight_kg * option.cost_per_kg}.\n *   4. Reduce to the one with the minimum total_cost_usd.\n *\n * Why greedy and not exhaustive? With ~10 options per request the search\n * space is trivial. We use greedy to keep the comparison clean against\n * the LLM branch, not because we couldn't afford the optimal search.\n */\nfunction pickCheapestFeasible(req, options) {\n  // LG-2 [hard] — LO-2: classical search baselines\n  if (!req || !Array.isArray(options)) return null;\n  const reqPerishable = req.perishable === true || String(req.perishable).toLowerCase() === \"true\";\n  // 1. Filter options against all 5 hard constraints.\n  const feasible = options.filter(opt => {\n    const optPerishable = opt.supports_perishable === true || String(opt.supports_perishable).toLowerCase() === \"true\";\n    return (\n      opt.origin_region === req.origin_region &&\n      opt.destination_region === req.dest_region &&\n      Number(opt.transit_days) <= Number(req.deadline_days) &&\n      Number(opt.max_weight_kg) >= Number(req.weight_kg) &&\n      (!reqPerishable || optPerishable)\n    );\n  });\n  // 2. Return null if no option satisfies the hard constraints.\n  if (feasible.length === 0) return null;\n  // 3. Map each feasible option to include total_cost_usd.\n  const withCost = feasible.map(opt => ({\n    ...opt,\n    total_cost_usd: Math.round(Number(req.weight_kg) * Number(opt.cost_per_kg) * 100) / 100,\n  }));\n  // 4. Reduce to the option with the minimum total_cost_usd.\n  return withCost.reduce((best, curr) =>\n    curr.total_cost_usd < best.total_cost_usd ? curr : best\n  );\n}\n\n// ---- Main loop (provided) -------------------------------------------------\n\nconst assignments = [];\nfor (const req of requests) {\n  const choice = pickCheapestFeasible(req, options);\n  assignments.push({\n    request_id: req.request_id,\n    weight_kg: req.weight_kg,\n    deadline_days: req.deadline_days,\n    chosen: choice,\n    feasible: choice !== null,\n    method: \"classical_greedy\",\n  });\n}\n\nreturn assignments.map(a => ({ json: a }));\n"
+      },
       "id": "a3186ddb-d0f2-5c13-8202-711c314bf431",
       "name": "Classical Logistics Fallback",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2880,
-        920
-      ],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "/**\n * Classical Logistics Planner \u2014 greedy fallback.\n *\n * Pedagogical purpose\n * -------------------\n * This is the \"planning without an LLM\" branch of the Logistics Coordinator.\n * The LLM logistics node handles soft-constraint cases (special instructions,\n * supplier relationships, urgency framing, multi-leg trade-offs). When the\n * upstream IF node decides a situation is purely numerical \u2014 fixed weight,\n * fixed deadline, available carriers \u2014 it routes here for a deterministic,\n * auditable choice.\n *\n * Greedy is the simplest classical search: at each decision point, take the\n * locally best option. It's not always globally optimal, but it's fast,\n * explainable, and a perfect baseline to compare LLM plans against.\n *\n * Reading: docs/planning-primer.md \u00a7\"Classical search and the cost of optimality\"\n */\n\n// Inputs are merged upstream \u2014 shipping requests AND the catalogue of options.\n//\n// A request: { type: \"request\", request_id, weight_kg, origin_region,\n//              dest_region, deadline_days, perishable }\n// An option: { type: \"option\",  option_id, carrier, mode, origin_region,\n//              destination_region, transit_days, cost_per_kg,\n//              max_weight_kg, supports_perishable }\n\nconst all = $input.all().map(i => i.json);\nconst requests = all.filter(x => x.type === \"request\");\nconst options  = all.filter(x => x.type === \"option\");\n\n// ---- TODO \u2014 greedy carrier assignment -------------------------------------\n\n/**\n * Pick the cheapest shipping option satisfying ALL hard constraints\n * for one request:\n *   - origin_region matches request.origin_region\n *   - destination_region matches request.dest_region\n *   - transit_days <= request.deadline_days\n *   - max_weight_kg >= request.weight_kg\n *   - if request.perishable === true, supports_perishable must also be true\n *\n * Total cost = request.weight_kg \u00d7 option.cost_per_kg  (we ignore time cost)\n *\n * @param {object} req\n * @param {Array}  options\n * @returns {object|null}  Chosen option augmented with `total_cost_usd`,\n *                         or null if nothing satisfies the constraints.\n *\n * Hint: this is two steps \u2014 filter, then min-by-cost.\n *   1. Array.prototype.filter against the 5 hard constraints.\n *   2. If the filtered list is empty, return null (infeasible).\n *   3. Map each survivor to {...option, total_cost_usd: req.weight_kg * option.cost_per_kg}.\n *   4. Reduce to the one with the minimum total_cost_usd.\n *\n * Why greedy and not exhaustive? With ~10 options per request the search\n * space is trivial. We use greedy to keep the comparison clean against\n * the LLM branch, not because we couldn't afford the optimal search.\n */\nfunction pickCheapestFeasible(req, options) {\n  // TODO [hard] \u2014 LO-2: classical search baselines\n  throw new Error(\"TODO [hard]: implement pickCheapestFeasible()\");\n}\n\n// ---- Main loop (provided) -------------------------------------------------\n\nconst assignments = [];\nfor (const req of requests) {\n  const choice = pickCheapestFeasible(req, options);\n  assignments.push({\n    request_id: req.request_id,\n    weight_kg: req.weight_kg,\n    deadline_days: req.deadline_days,\n    chosen: choice,\n    feasible: choice !== null,\n    method: \"classical_greedy\",\n  });\n}\n\nreturn assignments.map(a => ({ json: a }));\n"
-      }
+        928
+      ]
     },
     {
+      "parameters": {},
       "id": "64933313-39bd-5ce0-8c75-20f9981484b5",
       "name": "Merge Subgoal Results",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
         2880,
-        380
-      ],
-      "parameters": {
-        "mode": "append"
-      }
+        384
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "/**\n * Aggregate the active subgoal's output into a final business-friendly summary.\n * Only one branch fires per execution (the Switch routes on next_subgoal).\n *\n * FN-1 [medium] -- LO-1: closing the planning loop\n */\nconst planNode = $('Parse Plan').first().json;\nconst plan_id = planNode.plan_id || \"plan-unknown\";\nconst executed_subgoal = planNode.next_subgoal || \"unknown\";\nconst subgoals = Array.isArray(planNode.subgoals) ? planNode.subgoals : [];\n// Advance the HTN plan: find the next subgoal after `executed_subgoal` in topological order\nconst canonicalOrder = [\"forecast\", \"inventory\", \"supplier\", \"logistics\"];\nconst planOrder = subgoals.map(s => s.type).filter(Boolean);\nconst sequence = planOrder.length > 0 ? planOrder : canonicalOrder;\nconst idx = sequence.indexOf(executed_subgoal);\nconst next_recommended_subgoal =\n  idx >= 0 && idx + 1 < sequence.length ? sequence[idx + 1] : \"complete\";\n// Unwrap LLM envelopes (OpenAI choices[0].message.content or Anthropic content[0].text)\n// as well as direct Code-node JSON outputs (e.g. Classical Logistics Fallback).\nconst parsed = $input.all().map(item => {\n  const j = item.json;\n  const rawText = j?.choices?.[0]?.message?.content ?? j?.content?.[0]?.text;\n  if (typeof rawText === \"string\") {\n    const cleaned = rawText.replace(/^```(?:json)?\\s*/i, \"\").replace(/\\s*```$/i, \"\").trim();\n    try {\n      return JSON.parse(cleaned);\n    } catch (e) {\n      return { parse_error: e.message, raw: rawText };\n    }\n  }\n  return j;\n}).flat().filter(x => x.trade_off_summary !== \"Catalogue option row skipped.\");\n// Build human-readable key_findings tailored to whichever subgoal branch executed\nlet key_findings = [];\nif (executed_subgoal === \"forecast\") {\n  const anomalies = parsed.filter(x => Math.abs(Number(x.delta_pct || 0)) > 5);\n  key_findings = anomalies.map(\n    x => `${x.sku}: revised to ${x.revised_forecast} units (${x.delta_pct > 0 ? \"+\" : \"\"}${x.delta_pct}%) — ${x.reasoning}`\n  );\n} else if (executed_subgoal === \"inventory\") {\n  const actionable = parsed.filter(x => x.recommended_action && x.recommended_action !== \"hold\");\n  key_findings = actionable.map(\n    x => `${x.sku}: ${x.recommended_action.toUpperCase()} (qty: ${x.recommended_qty}) — ${x.reasoning}`\n  );\n} else if (executed_subgoal === \"supplier\") {\n  const sorted = [...parsed].sort((a, b) => Number(b.score_total || 0) - Number(a.score_total || 0));\n  key_findings = sorted.map(\n    s => `${s.supplier_id} [${s.tier}]: ${s.score_total}/100 — ${s.recommendation}`\n  );\n} else if (executed_subgoal === \"logistics\") {\n  key_findings = parsed.map(x =>\n    x.method === \"classical_greedy\"\n      ? `${x.request_id} (classical_greedy): feasible=${x.feasible}, chosen=${x.chosen?.option_id || \"NONE\"} ($${x.chosen?.total_cost_usd ?? \"N/A\"})`\n      : `${x.request_id} (LLM): chosen=${x.chosen_option_id || \"NONE\"} (fallback=${x.use_classical_fallback}) — ${x.trade_off_summary}`\n  );\n}\nreturn [{\n  json: {\n    plan_id,\n    executed_subgoal,\n    next_recommended_subgoal,\n    key_findings,\n    results: parsed,\n  },\n}];"
+      },
       "id": "7f14ee66-e79e-5450-823b-0f60e7d0a61e",
       "name": "Final Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         3120,
-        380
-      ],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "/**\n * Aggregate the active subgoal's output into a final business-friendly summary.\n * Only one branch fires per execution (the Switch routes on next_subgoal).\n *\n * TODO [medium] -- LO-1: closing the planning loop\n *   Decide what shape the human-readable summary should take. Suggested:\n *     { plan_id, executed_subgoal, key_findings: [...], next_recommended_subgoal }\n *   The `next_recommended_subgoal` is your hook for an iterative HTN -- feed\n *   it back into the planner on the next run to advance the plan.\n */\nconst items = $input.all().map(i => i.json);\nreturn [{ json: { executed_subgoal: \"TODO\", raw_outputs: items } }];\n"
-      }
+        384
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Manual Trigger": {
       "main": [
@@ -913,8 +892,19 @@
       ]
     }
   },
+  "active": false,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v0",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
   },
-  "pinData": {}
+  "versionId": "a9021d49-7186-4889-82c8-fb746485d968",
+  "meta": {
+    "instanceId": "418950af69300e7439d381fe07ab23ce6f1b3bcc6cdc7126d04c368f09345129"
+  },
+  "nodeGroups": [],
+  "id": "supply-chain-manager-v1",
+  "tags": []
 }

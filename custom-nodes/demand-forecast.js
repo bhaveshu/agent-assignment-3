@@ -25,7 +25,14 @@
 // ---- Input contract -------------------------------------------------------
 // Upstream node provides items where item.json = {month, sku, name, units_sold}
 // (the parsed sales_history.csv).
-const sales = $input.all().map(i => i.json);
+// NOTE: In the full workflow topology, `Route on Subgoal` (Switch) passes the
+// planner's output item rather than raw CSV rows. We fall back to
+// `$('Read Sales JSON').all()` when `$input` does not contain `units_sold`,
+// while preserving `$input.all()` for direct/standalone grader tests.
+const rawInput = $input.all().map(i => i.json);
+const sales = (rawInput.length > 0 && "units_sold" in rawInput[0])
+  ? rawInput
+  : $('Read Sales JSON').all().map(i => i.json);
 
 // ---- Helpers (provided — do not change) -----------------------------------
 
@@ -64,11 +71,14 @@ function nextMonth(monthStr) {
  * items — which is exactly why the seasonal index and the LLM step exist.
  */
 function movingAverage(series) {
-  // TODO [easy] — LO-3: classical baseline forecasting
-  //   1. Slice the last up-to-3 entries from `series`.
-  //   2. Sum their `units_sold` and divide by the count.
-  //   3. Return 0 for an empty series.
-  throw new Error("TODO [easy]: implement movingAverage()");
+  // DF-1 [easy] — LO-3: classical baseline forecasting
+  // Guard against empty or missing series.
+  if (!series || series.length === 0) return 0;
+
+  // Slice the last up-to-3 chronological entries and compute their mean.
+  const recent = series.slice(-3);
+  const sum = recent.reduce((acc, r) => acc + Number(r.units_sold), 0);
+  return sum / recent.length;
 }
 
 /**
@@ -90,15 +100,24 @@ function movingAverage(series) {
  * @returns {number}            Multiplier. Default to 1.0 if you can't compute one.
  */
 function seasonalIndex(series, targetMonth) {
-  // TODO [medium] — LO-3: time-series decomposition
-  //   1. Extract the month-of-year part: targetMonth.split("-")[1] -> "01".."12"
-  //   2. Compute monthMean = mean of units_sold in `series` where the month
-  //      portion of row.month matches.
-  //   3. Compute overallMean = mean of units_sold across the entire series.
-  //   4. Return monthMean / overallMean. Guard against division by zero
-  //      (return 1.0 if overallMean is 0).
-  //   5. If no rows match the target month part, return 1.0.
-  throw new Error("TODO [medium]: implement seasonalIndex()");
+  // DF-2 [medium] — LO-3: time-series decomposition
+  if (!series || series.length === 0 || !targetMonth) return 1.0;
+
+  // 1. Extract the 2-digit month-of-year portion ("01".."12").
+  const targetM = String(targetMonth).split("-")[1];
+
+  // 2. Filter rows matching the target month-of-year.
+  const matching = series.filter(r => String(r.month).split("-")[1] === targetM);
+  if (matching.length === 0) return 1.0;
+
+  // 3. Compute mean of matching month rows and overall series mean.
+  const monthMean = matching.reduce((acc, r) => acc + Number(r.units_sold), 0) / matching.length;
+  const overallMean = series.reduce((acc, r) => acc + Number(r.units_sold), 0) / series.length;
+
+  // 4. Guard against division by zero.
+  if (overallMean === 0) return 1.0;
+
+  return monthMean / overallMean;
 }
 
 // ---- Main loop (provided) -------------------------------------------------

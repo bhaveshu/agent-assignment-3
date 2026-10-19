@@ -29,123 +29,132 @@ def pos(col, row):
     return [240 + col * 240, 200 + row * 180]
 
 
-# ---- System prompts (with TODO scaffolding embedded) ----------------------
+# ---- System prompts (completed) --------------------------------------------
 
-MASTER_PLANNER_SYSTEM = """You are the Master Planner Agent for an e-commerce supply-chain operation.
-You receive a high-level business goal and a context summary. You decompose
-the goal into ordered subgoals and decide which subgoal to dispatch first.
+MASTER_PLANNER_SYSTEM = """You are the Master Planner Agent for Coastal Goods' supply chain operation. Given a business GOAL and a CONTEXT summary, decompose the goal into ordered subgoals using Hierarchical Task Network (HTN) principles and choose which single subgoal to execute first (`next_subgoal`).
 
-# TODO [easy] -- LO-1: hierarchical task decomposition
-# Define the OUTPUT JSON SCHEMA. The downstream Switch node routes on the
-# field `next_subgoal`. You must populate it with one of:
-#   "forecast" | "inventory" | "supplier" | "logistics"
-#
-# Required output shape:
-#   {
-#     "plan_id": "<short string>",
-#     "reasoning": "<2-3 sentences explaining the decomposition>",
-#     "subgoals": [
-#       { "id": "...", "type": "...", "rationale": "..." },
-#       ...
-#     ],
-#     "next_subgoal": "forecast" | "inventory" | "supplier" | "logistics"
-#   }
-#
-# Add explicit instructions to ALWAYS reply with raw JSON only -- no
-# markdown fences, no preamble. The Set node downstream parses with JSON.parse.
+Allowed subgoal types (`type` and `next_subgoal`):
+- "forecast": Predict future SKU demand from historical sales and context.
+- "inventory": Compute EOQ and handle stockout/overstock exceptions.
+- "supplier": Score and rank suppliers across cost, lead time, reliability, and quality.
+- "logistics": Assign shipping carriers under hard and soft constraints.
 
-# TODO [medium] -- LO-1: HTN-style decomposition with examples
-# Provide 1-2 worked examples in the system prompt showing how a goal
-# decomposes into ordered subgoals. The examples should demonstrate that
-# subgoal ORDERING matters -- e.g. you can't optimize inventory before
-# you have a demand forecast. Choose `next_subgoal` to be the first
-# unblocked subgoal in topological order.
-"""
+HTN Ordering Rules:
+Subgoals must respect causal dependencies (topological order). Always set `next_subgoal` to the FIRST unblocked subgoal required by the user's goal:
+- If the goal involves general Q1 planning, demand forecasting, or full supply-chain optimization where demand trends inform inventory, start with "forecast" -> "inventory" -> "supplier" -> "logistics".
+- If the goal explicitly focuses on immediate inventory EOQ / stockout / overstock triage assuming current demand, start with "inventory".
+- If the goal focuses on auditing or ranking vendor performance, start with "supplier".
+- If the goal focuses on carrier selection or freight routing, start with "logistics".
 
-FORECAST_ADJUSTER_SYSTEM = """You are the Forecast Context Adjuster.
-You receive a numerical forecast for one SKU (computed by the upstream
-classical engine) plus contextual notes. You revise the forecast when
-context demands it and return JSON.
+Worked Examples:
+Example 1:
+Goal: "Prepare a Q1 demand and replenishment plan for seasonal SKUs."
+Output:
+{"plan_id":"plan-q1-replenish","reasoning":"Replenishment quantities depend on projected Q1 demand, so demand forecasting must precede inventory EOQ optimization and supplier selection.","subgoals":[{"id":"sg-1","type":"forecast","rationale":"Estimate Q1 SKU demand and detect viral/seasonal shifts first."},{"id":"sg-2","type":"inventory","rationale":"Compute EOQ and exception actions using updated demand context."},{"id\":\"sg-3\",\"type\":\"supplier\",\"rationale\":\"Select high-reliability suppliers for reorders.\"}],\"next_subgoal\":\"forecast\"}
 
-# TODO [easy] -- LO-5: hybrid reasoning at the LLM/classical seam
-# Write the prompt body. Decide:
-#   1. What contextual signals warrant overriding the classical forecast?
-#      (Hint: viral mentions, weather anomalies, promotions, supply news.)
-#   2. By how much should the LLM be allowed to deviate from the math?
-#      (A 50% revision needs justification a 5% revision does not.)
-#   3. Required output JSON schema:
-#        { "sku", "revised_forecast", "delta_pct", "reasoning",
-#          "context_signals_used" }
-"""
+Example 2:
+Goal: "Audit current inventory for stockout/overstock anomalies and arrange urgent carrier shipping."
+Output:
+{"plan_id":"plan-inv-audit","reasoning":"The goal directly targets current on-hand vs reorder-point violations followed by outbound carrier scheduling, making inventory optimization the first unblocked task.","subgoals":[{"id":"sg-1","type":"inventory","rationale":"Run EOQ and flag viral spike or declining overstock SKUs immediately."},{"id":"sg-2","type":"logistics","rationale":"Book feasible carriers for emergency replenishment shipments."}],"next_subgoal":"inventory"}
 
-INVENTORY_EXCEPTION_SYSTEM = """You are the Inventory Exception Handler.
-You receive SKUs the EOQ formula flagged as having broken assumptions
-(viral spike, declining demand, low velocity, etc.). For each, propose
-an inventory action.
+Respond with RAW JSON ONLY (no markdown fences, no ```json, no preamble).
+Required schema:
+{
+  "plan_id": "<short string>",
+  "reasoning": "<2-3 sentences explaining the HTN decomposition and causal order>",
+  "subgoals": [
+    { "id": "sg-1", "type": "forecast|inventory|supplier|logistics", "rationale": "..." }
+  ],
+  "next_subgoal": "forecast|inventory|supplier|logistics"
+}"""
 
-# TODO [easy] -- LO-4: planning when the closed-form solution doesn't apply
-# Write the prompt body. Cover at minimum:
-#   - "viral_spike": recommend an emergency reorder size larger than EOQ
-#     suggests, because the formula's "constant demand" assumption is broken.
-#   - "declining": recommend NOT reordering, possibly a markdown.
-#   - "low_velocity": EOQ is numerically unstable; recommend a fixed
-#     small reorder qty (e.g. 30-day demand).
-# Required output JSON schema:
-#   { "sku", "recommended_action": "reorder"|"markdown"|"liquidate"|"hold",
-#     "recommended_qty", "reasoning" }
-"""
+FORECAST_ADJUSTER_SYSTEM = """You are the Forecast Context Adjuster for Coastal Goods. You receive a classical forecast row (`forecast_units = moving_avg * seasonal_index`) for target_month 2026-01 (January, mid-winter) and return raw JSON.
 
-SUPPLIER_SCORE_SYSTEM = """You are the Supplier Performance Monitor.
-You receive the supplier roster with KPIs and produce scored rankings.
+Adjustment Rules:
+1. High statistical_confidence (>= 0.80) OR normal seasonal alignment (summer gear with seasonal_index < 0.40 in Jan; winter gear with seasonal_index > 1.50 in Jan): Accept the classical forecast (`revised_forecast = forecast_units`, `delta_pct = 0`).
+2. Viral Spike Anomaly (winter/seasonal item with high moving_avg > 300, low statistical_confidence < 0.65, and seasonal_index < 1.0 in January): A Q4 viral surge inflated the annual mean and depressed the naive Jan seasonal_index. Revise `revised_forecast` upward by +35% to +50% above `forecast_units`.
+3. Secular Decline Anomaly (non-seasonal/legacy electronics like Wired Earbuds with low statistical_confidence < 0.50 and seasonal_index > 1.40 inflating forecast_units above moving_avg): A 12-month linear decline made last January look like a seasonal peak. Override the false seasonal bounce and revise `revised_forecast` downward below `moving_avg` (approx -45% to -55% from `forecast_units`).
 
-# TODO [medium] -- LO-5: LLM-based multi-criteria reasoning
-# Design a 0-100 scoring rubric across these four dimensions and explain
-# the weights you choose:
-#   - cost         (proxy: payment_terms_days; longer = better cash position)
-#   - lead time    (avg_lead_time_days; shorter = better)
-#   - reliability  (on_time_rate; higher = better)
-#   - quality      (1 - defect_rate; higher = better)
-# Required output JSON schema (one object per supplier):
-#   { "supplier_id", "score_total",
-#     "score_breakdown": { "cost", "lead_time", "reliability", "quality" },
-#     "tier": "preferred"|"approved"|"watch"|"deprioritize",
-#     "recommendation": "..." }
-"""
+Respond with RAW JSON ONLY (no markdown fences, no preamble):
+{
+  "sku": "<string>",
+  "revised_forecast": <integer>,
+  "delta_pct": <number>,
+  "reasoning": "<1-2 sentences>",
+  "context_signals_used": ["<signal 1>", "<signal 2>"]
+}"""
 
-LOGISTICS_SYSTEM = """You are the Logistics Coordinator.
-You receive shipping requests and the carrier catalogue. For each request
-you select a carrier and explain the trade-offs.
+INVENTORY_EXCEPTION_SYSTEM = """You are the Inventory Exception Handler for Coastal Goods. You receive a SKU row from the EOQ planner with `assumption_flags` and `needs_llm_review`.
 
-# TODO [easy] -- LO-5: LLM-based planning with soft constraints
-# Write the prompt body. Address:
-#   1. Hard constraints: deadline, weight, perishability, region match.
-#   2. Soft preferences: cost, transit-time risk, supplier relationships.
-#   3. When two options are close on cost, prefer the one with more
-#      time slack (transit_days well under deadline).
-# Required output JSON schema (one per request):
-#   { "request_id", "chosen_option_id", "alternatives_considered": [...],
-#     "trade_off_summary": "...", "use_classical_fallback": false }
-#
-# Set `use_classical_fallback: true` ONLY when the request is purely numeric
-# (no soft constraints) -- the IF node downstream will route those to the
-# deterministic greedy planner instead.
-"""
+Decision Rules:
+1. If `assumption_flags` contains "viral_spike": The constant-demand EOQ assumption is broken and the SKU faces acute stockout risk (`on_hand` < `reorder_point`). Recommend `recommended_action`: "reorder" with an emergency `recommended_qty` significantly larger than `eoq_units` (e.g., 1.5x to 2x `eoq_units`, or ~750-1000 units) to cover accelerating demand and lead time.
+2. If `assumption_flags` contains "declining": Demand is in secular decline and `on_hand` is heavily overstocked relative to `reorder_point`. Do NOT reorder; recommend `recommended_action`: "markdown" (or "liquidate" if `on_hand` > 6x `reorder_point`) and `recommended_qty`: 0.
+3. If `assumption_flags` contains "low_velocity": EOQ is numerically unstable at very low volume; recommend "reorder" (if below reorder_point) or "hold" with a small fixed `recommended_qty` equal to ~30-day demand (`Math.round(annual_demand / 12)`).
+4. If `assumption_flags` contains ONLY "long_lead_time": Recommend "reorder" (if `on_hand` <= 1.5 * `reorder_point`, setting `recommended_qty` = `eoq_units` plus a 20% safety buffer) or "hold" (`recommended_qty`: 0) if `on_hand` is already well above `reorder_point`.
+5. If `assumption_flags` is empty (`needs_llm_review: false`): Standard EOQ holds. Recommend "reorder" (`recommended_qty`: `eoq_units`) if `on_hand` <= `reorder_point`, otherwise "hold" (`recommended_qty`: 0).
 
-# ---- HTTP node builder for Anthropic Messages API -------------------------
+Respond with RAW JSON ONLY (no markdown fences, no preamble):
+{
+  "sku": "<string>",
+  "recommended_action": "reorder" | "markdown" | "liquidate" | "hold",
+  "recommended_qty": <integer>,
+  "reasoning": "<1-2 sentences explaining the decision and citing the flags/inventory levels>"
+}"""
+
+SUPPLIER_SCORE_SYSTEM = """You are the Supplier Performance Monitor for Coastal Goods, a DTC seasonal e-commerce brand. Score and rank every supplier in the roster on a 0-100 scale across four weighted dimensions (total weight = 100):
+
+1. reliability (max 35 pts): Based on `on_time_rate` (higher is better; e.g., >=0.97 gets 33-35, 0.91-0.95 gets 28-32, 0.84-0.88 gets 20-25).
+2. quality (max 25 pts): Based on `1 - defect_rate` (lower defect_rate is better; e.g., <=0.008 gets 23-25, 0.010-0.015 gets 19-22, >=0.018 gets 14-17).
+3. lead_time (max 25 pts): Based on `avg_lead_time_days` (shorter is better; e.g., <=7d gets 25, 14-18d gets 20-22, 24-28d gets 13-16, >=35d gets 10).
+4. cost (max 15 pts): Proxy is `payment_terms_days` (longer net terms improve cash flow; 60d = 15, 45d = 11, 30d = 8).
+
+Sum the four integers to get `score_total` (0-100). Assign `tier`:
+- "preferred": score_total >= 85
+- "approved": 75 <= score_total < 85
+- "watch": 65 <= score_total < 75
+- "deprioritize": score_total < 65
+
+Respond with a RAW JSON ARRAY of objects (one object per supplier, no markdown fences, no preamble):
+[
+  {
+    "supplier_id": "<string>",
+    "score_total": <integer>,
+    "score_breakdown": { "cost": <int>, "lead_time": <int>, "reliability": <int>, "quality": <int> },
+    "tier": "preferred" | "approved" | "watch" | "deprioritize",
+    "recommendation": "<1 sentence actionable recommendation>"
+  }
+]"""
+
+LOGISTICS_SYSTEM = """You are the Logistics Coordinator for Coastal Goods. You receive a shipping input and the carrier catalogue (`Options`).
+
+Rules:
+1. If the input `Request` has `type: "option"` (not a shipping request), return `{"request_id": $json.option_id, "chosen_option_id": null, "alternatives_considered": [], "trade_off_summary": "Catalogue option row skipped.", "use_classical_fallback": false}`.
+2. Hard constraints (MUST satisfy all): `origin_region` == request `origin_region`, `destination_region` == request `dest_region`, `transit_days` <= `deadline_days`, `max_weight_kg` >= `weight_kg`, and if `perishable == true` then `supports_perishable == true`.
+3. Soft preferences: Balance total cost (`weight_kg * cost_per_kg`) against transit-time slack (`deadline_days - transit_days`). When two feasible options are within ~10% on cost, prefer the carrier with greater time slack. If NO carrier meets hard constraints (e.g. REQ-002 needing <=3d in North America when fastest ground is 5d), set `chosen_option_id: null` and explain the closest alternative (`SHP-005` UPS Ground at 5d) in `trade_off_summary`.
+4. Classical Fallback (`use_classical_fallback`): Set `use_classical_fallback: true` ONLY when the request is purely numerical with no soft-constraint ambiguity or infeasibility (e.g., standard non-perishable freight like REQ-001 or REQ-003 where deterministic greedy min-cost search applies). Set `use_classical_fallback: false` when soft-constraint reasoning or infeasible-deadline escalation is needed (like REQ-002).
+
+Respond with RAW JSON ONLY (no markdown fences, no preamble):
+{
+  "request_id": "<string>",
+  "chosen_option_id": "<string or null>",
+  "alternatives_considered": ["<option_id>", ...],
+  "trade_off_summary": "<1-2 sentences>",
+  "use_classical_fallback": true | false
+}"""
+
+# ---- HTTP node builder for OpenAI Chat Completions API ---------------------
 
 def http_anthropic(name, slug, system_prompt, user_expr, col, row):
     """
-    Build an HTTP Request node calling Anthropic's Messages API.
-    `user_expr` is a JS expression (no surrounding quotes) that yields a
-    string -- the user message body. We wrap it in JSON.stringify(...) so
-    the rendered JSON is always valid regardless of newlines/quotes inside.
+    Build an HTTP Request node calling OpenAI's Chat Completions API with gpt-6-luna.
     """
     body = (
         '={\n'
-        '  "model": "claude-sonnet-4-6",\n'
-        '  "max_tokens": 2048,\n'
-        '  "system": ' + json.dumps(system_prompt) + ',\n'
+        '  "model": "gpt-6-luna",\n'
+        '  "reasoning_effort": "none",\n'
+        '  "max_completion_tokens": 2048,\n'
         '  "messages": [\n'
+        '    { "role": "system", "content": ' + json.dumps(system_prompt) + ' },\n'
         '    { "role": "user", "content": {{ JSON.stringify(' + user_expr + ') }} }\n'
         '  ]\n'
         '}'
@@ -158,19 +167,18 @@ def http_anthropic(name, slug, system_prompt, user_expr, col, row):
         "position": pos(col, row),
         "credentials": {
             "httpHeaderAuth": {
-                "id": "anthropic-credential-placeholder",
-                "name": "Anthropic API Key",
+                "id": "openai-credential-placeholder",
+                "name": "OpenAI Header Auth",
             }
         },
         "parameters": {
             "method": "POST",
-            "url": "https://api.anthropic.com/v1/messages",
+            "url": "https://api.openai.com/v1/chat/completions",
             "authentication": "genericCredentialType",
             "genericAuthType": "httpHeaderAuth",
             "sendHeaders": True,
             "headerParameters": {
                 "parameters": [
-                    {"name": "anthropic-version", "value": "2023-06-01"},
                     {"name": "content-type", "value": "application/json"},
                 ]
             },
@@ -337,14 +345,9 @@ nodes.append(http_anthropic(
 
 # 13. Parse Plan
 parse_plan_code = '''/**
- * Extract the Master Planner's JSON from the Anthropic response envelope.
- * Anthropic returns { content: [{ type: "text", text: "..." }], ... }.
- *
- * If your planner replies with markdown fences (```json ...```), the
- * JSON.parse below will fail. Forbid fences in your system prompt
- * (preferred) or strip them here.
+ * Extract the Master Planner's JSON from the OpenAI / Anthropic response envelope.
  */
-const raw = $json.content[0].text.trim();
+const raw = ($json.choices?.[0]?.message?.content ?? $json.content?.[0]?.text ?? "").trim();
 let plan;
 try {
   plan = JSON.parse(raw);
@@ -410,7 +413,7 @@ nodes.append(http_anthropic(
 # 17. Supplier branch
 nodes.append(http_anthropic(
     "Supplier Performance Monitor", "supplier-score", SUPPLIER_SCORE_SYSTEM,
-    "'Supplier roster:\\n' + JSON.stringify($input.all().map(i => i.json), null, 2)",
+    "'Supplier roster:\\n' + JSON.stringify(($input.all()[0]?.json?.supplier_id ? $input.all() : $('Read Suppliers JSON').all()).map(i => i.json), null, 2)",
     8, 2,
 ))
 
@@ -444,7 +447,7 @@ nodes.append({
         "conditions": {
             "options": {"caseSensitive": True, "typeValidation": "strict"},
             "conditions": [{
-                "leftValue": "={{ $json.use_classical_fallback }}",
+                "leftValue": "={{ JSON.parse($json.choices?.[0]?.message?.content ?? $json.content?.[0]?.text ?? \"{}\").use_classical_fallback }}",
                 "rightValue": True,
                 "operator": {"type": "boolean", "operation": "true"},
             }],
@@ -471,14 +474,74 @@ final_code = '''/**
  * Aggregate the active subgoal's output into a final business-friendly summary.
  * Only one branch fires per execution (the Switch routes on next_subgoal).
  *
- * TODO [medium] -- LO-1: closing the planning loop
- *   Decide what shape the human-readable summary should take. Suggested:
- *     { plan_id, executed_subgoal, key_findings: [...], next_recommended_subgoal }
- *   The `next_recommended_subgoal` is your hook for an iterative HTN -- feed
+ * FN-1 [medium] -- LO-1: closing the planning loop
+ *   Shape: { plan_id, executed_subgoal, next_recommended_subgoal, key_findings, results }
+ *   `next_recommended_subgoal` is the hook for an iterative HTN -- feed
  *   it back into the planner on the next run to advance the plan.
  */
-const items = $input.all().map(i => i.json);
-return [{ json: { executed_subgoal: "TODO", raw_outputs: items } }];
+const planNode = $('Parse Plan').first().json;
+const plan_id = planNode.plan_id || "plan-unknown";
+const executed_subgoal = planNode.next_subgoal || "unknown";
+const subgoals = Array.isArray(planNode.subgoals) ? planNode.subgoals : [];
+
+// Advance the HTN plan: find the next subgoal after `executed_subgoal` in topological order
+const canonicalOrder = ["forecast", "inventory", "supplier", "logistics"];
+const planOrder = subgoals.map(s => s.type).filter(Boolean);
+const sequence = planOrder.length > 0 ? planOrder : canonicalOrder;
+const idx = sequence.indexOf(executed_subgoal);
+const next_recommended_subgoal =
+  idx >= 0 && idx + 1 < sequence.length ? sequence[idx + 1] : "complete";
+
+// Unwrap LLM envelopes (OpenAI choices[0].message.content or Anthropic content[0].text)
+// as well as direct Code-node JSON outputs (e.g. Classical Logistics Fallback).
+const parsed = $input.all().map(item => {
+  const j = item.json;
+  const rawText = j?.choices?.[0]?.message?.content ?? j?.content?.[0]?.text;
+  if (typeof rawText === "string") {
+    const cleaned = rawText.replace(/^```(?:json)?\\s*/i, "").replace(/\\s*```$/i, "").trim();
+    try {
+      return JSON.parse(cleaned);
+    } catch (e) {
+      return { parse_error: e.message, raw: rawText };
+    }
+  }
+  return j;
+}).flat().filter(x => x.trade_off_summary !== "Catalogue option row skipped.");
+
+// Build human-readable key_findings tailored to whichever subgoal branch executed
+let key_findings = [];
+if (executed_subgoal === "forecast") {
+  const anomalies = parsed.filter(x => Math.abs(Number(x.delta_pct || 0)) > 5);
+  key_findings = anomalies.map(
+    x => `${x.sku}: revised to ${x.revised_forecast} units (${x.delta_pct > 0 ? "+" : ""}${x.delta_pct}%) — ${x.reasoning}`
+  );
+} else if (executed_subgoal === "inventory") {
+  const actionable = parsed.filter(x => x.recommended_action && x.recommended_action !== "hold");
+  key_findings = actionable.map(
+    x => `${x.sku}: ${x.recommended_action.toUpperCase()} (qty: ${x.recommended_qty}) — ${x.reasoning}`
+  );
+} else if (executed_subgoal === "supplier") {
+  const sorted = [...parsed].sort((a, b) => Number(b.score_total || 0) - Number(a.score_total || 0));
+  key_findings = sorted.map(
+    s => `${s.supplier_id} [${s.tier}]: ${s.score_total}/100 — ${s.recommendation}`
+  );
+} else if (executed_subgoal === "logistics") {
+  key_findings = parsed.map(x =>
+    x.method === "classical_greedy"
+      ? `${x.request_id} (classical_greedy): feasible=${x.feasible}, chosen=${x.chosen?.option_id || "NONE"} ($${x.chosen?.total_cost_usd ?? "N/A"})`
+      : `${x.request_id} (LLM): chosen=${x.chosen_option_id || "NONE"} (fallback=${x.use_classical_fallback}) — ${x.trade_off_summary}`
+  );
+}
+
+return [{
+  json: {
+    plan_id,
+    executed_subgoal,
+    next_recommended_subgoal,
+    key_findings,
+    results: parsed,
+  },
+}];
 '''
 nodes.append(code_node("Final Output", "final-output", final_code, 12, 1))
 
@@ -536,7 +599,7 @@ workflow = {
     "name": "Supply Chain Manager (Starter)",
     "nodes": nodes,
     "connections": connections,
-    "settings": {"executionOrder": "v1"},
+    "settings": {"executionOrder": "v0"},
     "pinData": {},
 }
 

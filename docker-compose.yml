@@ -30,6 +30,7 @@ services:
       # Allow {{ $env.X }} in node expressions. Off by default in n8n for
       # multi-tenant safety; fine to enable on a single-user local dev box.
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_RESTRICT_FILE_ACCESS_TO=/data
     volumes:
       - n8n_data:/home/node/.n8n
       - ./workflows:/workflows:ro
